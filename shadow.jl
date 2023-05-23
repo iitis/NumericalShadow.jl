@@ -18,7 +18,10 @@ function random_pure(d, batchsize)
 end
 
 function random_max_ent(d, batchsize)
-    
+    x = CUDA.randn(ComplexF32, d, d, batchsize)
+    tau, A = CUDA.CUBLAS.geqrf_batched(collect(eachslice(x, dims=3)));
+    q, r = reconstruct_qr(tau, A)
+    return qr_fix!(q, r)
 end
 
 function shadow_GPU(A::Matrix, samples::Int, batchsize::Int=1_000_000)
@@ -31,30 +34,6 @@ function shadow_GPU(A::Matrix, samples::Int, batchsize::Int=1_000_000)
         ret[(i-1) * batchsize + 1:i * batchsize] = dropdims(batched_adjoint(ψd) ⊠ Ad ⊠ ψd, dims = (1, 2))
     end
     return ret
-end
-
-function shadow_GPU2(A::Matrix, samples::Int, batchsize::Int=1_000_000)
-    num_batches = div(samples, batchsize)
-    d = size(A, 1)
-    Ad = cu(unsqueeze(A, 3))
-    Ad2 = cu(A)
-    @showprogress for i=1:num_batches
-        ψd = random_pure(d, batchsize)
-        for j=1:batchsize
-            ψd[:, 1, j]' * Ad2 * ψd[:, 1, j]
-        end
-    end
-end
-
-function shadow_batched(A::Matrix, samples::Int, batchsize::Int=1_000_000)
-    num_batches = div(samples, batchsize)
-    d = size(A, 1)
-    Ad = unsqueeze(A, 3)
-    dist = HaarKet(d)
-    @showprogress for i=1:num_batches
-        ψd = batch((unsqueeze(rand(dist), 2) for _ = 1:batchsize))
-        batched_adjoint(ψd) ⊠ Ad ⊠ ψd
-    end
 end
 
 function plot_shadow(s::Vector{ComplexF64}, A, fname)
@@ -133,7 +112,7 @@ function max_entangled_shadow(A::Hermitian, samples::Int)
     dist = CUE(d)
     Threads.@threads for i=1:samples
         U = rand(dist)
-        ψ = vec(U)
+        ψ = vec(U) / d
         ret[i] = ψ' * A * ψ
     end
     return ret
@@ -141,20 +120,21 @@ end
 
 function compare_shadows(samples, n)
 
-    A = diagm(0=>[exp(2 * pi * 1im * i / n ) for i=1:n])
+    # A = diagm(0=>[exp(2 * pi * 1im * i / n ) for i=1:n])
     # @time ret = max_entangled_shadow(A, samples)
     # p1 = plot_shadow(ret, A, "ent_shadow_complex.png")
 
-    @time ret = shadow(A, samples)
-    @time ret = shadow(A, samples)
-    # p2 = plot_shadow(ret, A, "shadow_complex.png")
+    @time ret = ComplexF64.(collect(shadow_GPU(A, samples)))
+    @time ret = ComplexF64.(collect(shadow_GPU(A, samples)))
+    # @time ret = shadow(A, samples)
+    p2 = plot_shadow(ret, A, "shadow_complex.png")
 
-    l = @layout [a b]
+    # l = @layout [a b]
     # plot(p1, p2, layout=l)
     # savefig("complex.png")
 end
-# BLAS.set_num_threads(1)
+BLAS.set_num_threads(1)
 n = 9
-samples = 1_000_000
+samples = 1_000_000_000
 A = diagm(0=>[exp(2 * pi * 1im * i / n ) for i=1:n])
-# compare_shadows(samples, n)
+compare_shadows(samples, n)
