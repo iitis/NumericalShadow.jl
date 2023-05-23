@@ -3,24 +3,46 @@ using LinearAlgebra
 using MatrixEnsembles, QuantumInformation
 using BenchmarkTools
 using Base.Threads
-using Flux, MLUtils
+import MLUtils: unsqueeze
 using ProgressMeter
 using CUDA
+import NNlibCUDA: ⊠, batched_adjoint
+
+CUDA.allowscalar(false)
 
 function random_pure(d, batchsize)
     ψd = CUDA.randn(ComplexF32, d, 1, batchsize)
-    norm_invs = 1 ./ sqrt.(sum(abs.(ψd) .^ 2, dims=1))
+    norm_invs = complex.(1 ./ sqrt.(sum(abs.(ψd) .^ 2, dims=1)))
     ψd = ψd ⊠ norm_invs;
     return ψd
+end
+
+function random_max_ent(d, batchsize)
+    
 end
 
 function shadow_GPU(A::Matrix, samples::Int, batchsize::Int=1_000_000)
     num_batches = div(samples, batchsize)
     d = size(A, 1)
-    Ad = cu(unsqueeze(A, 3))
+    Ad = cu(A)
+    ret = CUDA.zeros(ComplexF32, samples)
     @showprogress for i=1:num_batches
         ψd = random_pure(d, batchsize)
-        batched_adjoint(ψd) ⊠ Ad ⊠ ψd
+        ret[(i-1) * batchsize + 1:i * batchsize] = dropdims(batched_adjoint(ψd) ⊠ Ad ⊠ ψd, dims = (1, 2))
+    end
+    return ret
+end
+
+function shadow_GPU2(A::Matrix, samples::Int, batchsize::Int=1_000_000)
+    num_batches = div(samples, batchsize)
+    d = size(A, 1)
+    Ad = cu(unsqueeze(A, 3))
+    Ad2 = cu(A)
+    @showprogress for i=1:num_batches
+        ψd = random_pure(d, batchsize)
+        for j=1:batchsize
+            ψd[:, 1, j]' * Ad2 * ψd[:, 1, j]
+        end
     end
 end
 
@@ -74,13 +96,18 @@ function max_entangled_shadow(A::Matrix, samples::Int)
     return ret
 end
 
+function f(dist)
+    ψ = rand(dist)
+    return ψ' * A * ψ
+end
+
 function shadow(A::Matrix, samples::Int)
     d = size(A, 1)
     dist = HaarKet(d)
     ret = zeros(ComplexF64, samples)
+    
     Threads.@threads for i=1:samples
-        ψ = rand(dist)
-        ret[i] = ψ' * A * ψ
+        ret[i] = f(dist)
     end
     return ret
 end
@@ -94,8 +121,7 @@ function shadow2(A::Matrix, samples::Int, batchsize::Int=1_000_000)
     Threads.@threads for i=1:num_batches
         for i=1:samples
             ψ = rand(dist)
-            #ret[i] =
-             ψ' * A * ψ
+            ret[i] = ψ' * A * ψ
         end
     end
     return ret
@@ -116,18 +142,19 @@ end
 function compare_shadows(samples, n)
 
     A = diagm(0=>[exp(2 * pi * 1im * i / n ) for i=1:n])
-    @time ret = max_entangled_shadow(A, samples)
-    p1 = plot_shadow(ret, A, "ent_shadow_complex.png")
+    # @time ret = max_entangled_shadow(A, samples)
+    # p1 = plot_shadow(ret, A, "ent_shadow_complex.png")
 
     @time ret = shadow(A, samples)
-    p2 = plot_shadow(ret, A, "shadow_complex.png")
+    @time ret = shadow(A, samples)
+    # p2 = plot_shadow(ret, A, "shadow_complex.png")
 
     l = @layout [a b]
-    plot(p1, p2, layout=l)
-    savefig("complex.png")
+    # plot(p1, p2, layout=l)
+    # savefig("complex.png")
 end
 # BLAS.set_num_threads(1)
 n = 9
-samples = 100_000_000
+samples = 1_000_000
 A = diagm(0=>[exp(2 * pi * 1im * i / n ) for i=1:n])
-compare_shadows(samples, n)
+# compare_shadows(samples, n)
