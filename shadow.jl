@@ -68,8 +68,11 @@ function max_entangled_shadow(A::Matrix, samples::Int)
     # Generate a random unitary matrix
     dist = CUE(d)
     Threads.@threads for i=1:samples
-        U = rand(dist)
-        ψ = vec(U)
+        g = randn(ComplexF64, d, d)
+        q, r = LinearAlgebra.qr(g)
+        ψ = vec(collect(q))
+        # U = rand(dist)
+        # ψ = vec(U)
         ret[i] = ψ' * A * ψ
     end
     return ret
@@ -120,14 +123,15 @@ end
 
 function compare_shadows(samples, n)
 
-    # A = diagm(0=>[exp(2 * pi * 1im * i / n ) for i=1:n])
-    # @time ret = max_entangled_shadow(A, samples)
-    # p1 = plot_shadow(ret, A, "ent_shadow_complex.png")
+    A = diagm(0=>[exp(2 * pi * 1im * i / n ) for i=1:n])
+    @time ret = max_entangled_shadow(A, samples)
+    @time ret = max_entangled_shadow(A, samples)
+    p1 = plot_shadow(ret, A, "ent_shadow_complex.png")
 
-    @time ret = ComplexF64.(collect(shadow_GPU(A, samples)))
-    @time ret = ComplexF64.(collect(shadow_GPU(A, samples)))
+    # @time ret = ComplexF64.(collect(shadow_GPU(A, samples)))
+    # @time ret = ComplexF64.(collect(shadow_GPU(A, samples)))
     # @time ret = shadow(A, samples)
-    p2 = plot_shadow(ret, A, "shadow_complex.png")
+    # p2 = plot_shadow(ret, A, "shadow_complex.png")
 
     # l = @layout [a b]
     # plot(p1, p2, layout=l)
@@ -135,6 +139,6 @@ function compare_shadows(samples, n)
 end
 BLAS.set_num_threads(1)
 n = 9
-samples = 1_000_000_000
+samples = 1_000_000
 A = diagm(0=>[exp(2 * pi * 1im * i / n ) for i=1:n])
 compare_shadows(samples, n)
