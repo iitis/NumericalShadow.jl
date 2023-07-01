@@ -1,10 +1,16 @@
 name = "NumericalShadow"
-uuid = "052768ef-5323-5732-b1bb-66c8b64840ba"
+uuid = "cf08b3b2-491f-4659-a90e-a7afc6df83ad"
 version = "0.0.1"
-
-
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MLUtils = "f1d291b0-491e-4a28-83b9-f70985020b54"
+NNlibCUDA = "a00861dc-f156-4864-bf3c-e6376f28a68d"
+NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
+
+[compat]
+julia = "1.9"

@@ -1,7 +1,3 @@
-using LinearAlgebra
-
-const nTPB = 256
-
 function numerical_range(A::Matrix,resolution::Number=0.01)
     w = ComplexF64[]
     for θ in 0:resolution:2pi
@@ -55,6 +51,8 @@ struct Hist2D
     x_edges::AbstractVector
     y_edges::AbstractVector
     hist::AbstractMatrix
+    nr::AbstractVector
+    Hist2D(x_edges, y_edges, hist) = new(x_edges, y_edges, hist)
 end
 
 function Hist2D(x_edges::AbstractVector, y_edges::AbstractVector)
@@ -68,9 +66,13 @@ function Hist2D(x_edges::CuVector, y_edges::CuVector)
 end
 
 function Base.:+(h1::Hist2D, h2::Hist2D)
-    @assert h1.x_edges .≈ h2.x_edges
-    @assert h1.y_edges .≈ h2.y_edges
+    @assert all(h1.x_edges .≈ h2.x_edges)
+    @assert all(h1.y_edges .≈ h2.y_edges)
     Hist2D(h1.x_edges, h1.y_edges, h1.hist + h2.hist)
+end
+
+function save(h::Hist2D, fname::String)
+    NPZ.npzwrite(fname, Dict("x_edges"=>Array(h.x_edges), "y_edges"=>Array(h.y_edges), "hist"=>Array(h.hist), "nr"=>Array(nr)))
 end
 
 function histogram(xs::CuVector, ys::CuVector, x_edges::CuVector, y_edges::CuVector)
@@ -97,6 +99,5 @@ function histogram(xs::CuVector, ys::CuVector, x_edges::CuVector, y_edges::CuVec
     n_blocks = (length(xs) + nTPB - 1) ÷ nTPB
     hist = CUDA.zeros(Int32, length(x_edges) - 1, length(y_edges) - 1)
     @cuda threads=nTPB blocks=n_blocks kernel(xs, ys, x_edges, y_edges, hist)
-    # hist = reshape(hist, (length(x_edges), length(y_edges)))
     Hist2D(x_edges, y_edges, hist)
 end

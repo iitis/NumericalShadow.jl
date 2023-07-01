@@ -1,19 +1,14 @@
-using Plots
-using LinearAlgebra
-using MatrixEnsembles, QuantumInformation
-using BenchmarkTools
 using Base.Threads
 import MLUtils: unsqueeze
-using ProgressMeter
 using CUDA
 import NNlibCUDA: ⊠, batched_adjoint
 
 CUDA.allowscalar(false)
 
 
-function random_pure(d, batchsize)
-    ψd = CUDA.randn(ComplexF32, d, 1, batchsize)
-    norm_invs = complex.(1 ./ sqrt.(sum(abs.(ψd) .^ 2, dims=1)))
+function random_pure(::Type{T}, d, batchsize) where {T}
+    ψd = CUDA.randn(T, d, 1, batchsize)
+    norm_invs = T.(1 ./ sqrt.(sum(abs.(ψd) .^ 2, dims=1)))
     ψd = ψd ⊠ norm_invs;
     return ψd
 end
