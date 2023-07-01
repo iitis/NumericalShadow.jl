@@ -8,11 +8,11 @@ function non_strided(a, b)
     CUDA.@time x = [@view a[:, :, i] for i in axes(a, 3)]
     CUDA.@time y = [@view b[:, :, i] for i in axes(b, 3)]
     println("end view")
-    CUDA.CUBLAS.gemm_batched('N', 'N', 1f0, x, y)
+    CUDA.CUBLAS.gemm_batched('N', 'N', 1.0f0, x, y)
 end
 
 function strided(a, b)
-    CUDA.CUBLAS.gemm_strided_batched('N', 'N', 1f0, a, b)
+    CUDA.CUBLAS.gemm_strided_batched('N', 'N', 1.0f0, a, b)
 end
 
 function generate_matrices(d, nbatch)

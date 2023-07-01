@@ -1,34 +1,44 @@
-function numerical_range(A::Matrix,resolution::Number=0.01)
+function numerical_range(A::Matrix, resolution::Number = 0.01)
     w = ComplexF64[]
-    for θ in 0:resolution:2pi
+    for θ = 0:resolution:2pi
         Ath = exp(1im * -θ) * A
         Hth = Hermitian(Ath)
         F = eigen(Hth)
         m = F.values[end]
         s = findall(≈(m), F.values)
         if length(s) == 1
-            p = F.vectors[:, s]' * A * F.vectors[:,s]
+            p = F.vectors[:, s]' * A * F.vectors[:, s]
             push!(w, tr(p))
         else
-            Kth = 1im * (Hth-Ath)
+            Kth = 1im * (Hth - Ath)
             pKp = F.vectors[:, s]' * Kth * F.vectors[:, s]
             FF = eigen(pKp)
             mm = FF.values[1]
             ss = findall(≈(mm), F.values)
-            p = FF.vectors[:, ss[1]]' * F.vectors[:,s]' * A * F.vectors[:,s] * FF.vectors[:,ss[1]]
+            p =
+                FF.vectors[:, ss[1]]' *
+                F.vectors[:, s]' *
+                A *
+                F.vectors[:, s] *
+                FF.vectors[:, ss[1]]
             push!(w, tr(p))
-            mM=maximum(FF.values[end])
+            mM = maximum(FF.values[end])
             sS = findall(≈(mM), F.values)
-            p = FF.vectors[:,sS[1]]' * F.vectors[:,s]' * A * F.vectors[:,s] * FF.vecotrs[:,sS[1]]
+            p =
+                FF.vectors[:, sS[1]]' *
+                F.vectors[:, s]' *
+                A *
+                F.vectors[:, s] *
+                FF.vecotrs[:, sS[1]]
             push!(w, tr(p))
         end
     end
     return w
 end
-  
+
 function get_bounding_box_old(A::Matrix)
     reA = Hermitian(A + A' / 2)
-    imA = Hermitian(-1im*(A-A') / 2.0)
+    imA = Hermitian(-1im * (A - A') / 2.0)
     reEig = eigvals(reA)
     imEig = eigvals(imA)
     mx, Mx, my, My = reEig[1], reEig[end], imEig[1], imEig[end]
@@ -40,10 +50,10 @@ function get_bounding_box(A::Matrix)
     minimum(real(nr)), maximum(real(nr)), minimum(imag(nr)), maximum(imag(nr))
 end
 
-function get_bin_edges(A::Matrix, nbins_x::Int, nbins_y::Int=nbins_x)
+function get_bin_edges(A::Matrix, nbins_x::Int, nbins_y::Int = nbins_x)
     min_x, max_x, min_y, max_y = get_bounding_box(A)
-    x_edges = min_x:(max_x - min_x)/nbins_x:max_x
-    y_edges = min_y:(max_y - min_y)/nbins_y:max_y
+    x_edges = min_x:(max_x-min_x)/nbins_x:max_x
+    y_edges = min_y:(max_y-min_y)/nbins_y:max_y
     x_edges, y_edges
 end
 
@@ -52,6 +62,7 @@ struct Hist2D
     y_edges::AbstractVector
     hist::AbstractMatrix
     nr::AbstractVector
+    evs::AbstractVector
     Hist2D(x_edges, y_edges, hist) = new(x_edges, y_edges, hist)
 end
 
@@ -72,7 +83,16 @@ function Base.:+(h1::Hist2D, h2::Hist2D)
 end
 
 function save(h::Hist2D, fname::String)
-    NPZ.npzwrite(fname, Dict("x_edges"=>Array(h.x_edges), "y_edges"=>Array(h.y_edges), "hist"=>Array(h.hist), "nr"=>Array(nr)))
+    NPZ.npzwrite(
+        fname,
+        Dict(
+            "x_edges" => Array(h.x_edges),
+            "y_edges" => Array(h.y_edges),
+            "hist" => Array(h.hist),
+            "nr" => Array(nr),
+            "evs" => Array(evs),
+        ),
+    )
 end
 
 function histogram(xs::CuVector, ys::CuVector, x_edges::CuVector, y_edges::CuVector)
@@ -98,6 +118,6 @@ function histogram(xs::CuVector, ys::CuVector, x_edges::CuVector, y_edges::CuVec
     @assert length(xs) == length(ys)
     n_blocks = (length(xs) + nTPB - 1) ÷ nTPB
     hist = CUDA.zeros(Int32, length(x_edges) - 1, length(y_edges) - 1)
-    @cuda threads=nTPB blocks=n_blocks kernel(xs, ys, x_edges, y_edges, hist)
+    @cuda threads = nTPB blocks = n_blocks kernel(xs, ys, x_edges, y_edges, hist)
     Hist2D(x_edges, y_edges, hist)
 end

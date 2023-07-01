@@ -3,13 +3,13 @@ using LinearAlgebra
 using BenchmarkTools
 
 function no_bug(samples::Int)
-    Threads.@threads for i=1:samples
+    Threads.@threads for i = 1:samples
         g = randn(ComplexF64, 3, 3)
     end
 end
 
 function bug(samples::Int)
-    Threads.@threads for i=1:samples
+    Threads.@threads for i = 1:samples
         g = randn(ComplexF64, 3, 3)
         q, r = qr(g)
     end

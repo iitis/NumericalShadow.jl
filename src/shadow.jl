@@ -1,13 +1,13 @@
 using ProgressMeter
 
-function shadow_GPU(A::Matrix, samples::Int, sampling_f, batchsize::Int=1_000_000)
+function shadow_GPU(A::Matrix, samples::Int, sampling_f, batchsize::Int = 1_000_000)
     num_batches = div(samples, batchsize)
     d = size(A, 1)
     Ad = cu(A)
     x_edges, y_edges = cu.(collect.(get_bin_edges(A, 1000)))
     shadow = Hist2D(x_edges, y_edges)
-    @showprogress for i=1:num_batches
-        ψd = sampling_f(d, num_batches==1 ? samples : batchsize)
+    @showprogress for i = 1:num_batches
+        ψd = sampling_f(d, num_batches == 1 ? samples : batchsize)
         points = dropdims(batched_adjoint(ψd) ⊠ Ad ⊠ ψd, dims = (1, 2))
         shadow += histogram(real(points), imag(points), x_edges, y_edges)
     end
@@ -40,7 +40,7 @@ end
 #     d = size(A, 1)
 #     dist = HaarKet(d)
 #     ret = zeros(ComplexF64, samples)
-    
+
 #     Threads.@threads for i=1:samples
 #         ret[i] = f(dist)
 #     end
