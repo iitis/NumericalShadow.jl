@@ -57,7 +57,7 @@ function get_bin_edges(A::Matrix, nbins_x::Int, nbins_y::Int = nbins_x)
     x_edges, y_edges
 end
 
-struct Hist2D
+mutable struct Hist2D
     x_edges::AbstractVector
     y_edges::AbstractVector
     hist::AbstractMatrix
@@ -89,8 +89,8 @@ function save(h::Hist2D, fname::String)
             "x_edges" => Array(h.x_edges),
             "y_edges" => Array(h.y_edges),
             "hist" => Array(h.hist),
-            "nr" => Array(nr),
-            "evs" => Array(evs),
+            "nr" => Array(h.nr),
+            "evs" => Array(h.evs),
         ),
     )
 end
