@@ -1,3 +1,9 @@
+name = "NumericalShadow"
+uuid = "052768ef-5323-5732-b1bb-66c8b64840ba"
+version = "0.0.1"
+
+
+
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
