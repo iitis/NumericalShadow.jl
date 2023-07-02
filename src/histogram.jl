@@ -2,7 +2,7 @@ function numerical_range(A::Matrix, resolution::Number = 0.01)
     w = ComplexF64[]
     for θ = 0:resolution:2pi
         Ath = exp(1im * -θ) * A
-        Hth = Hermitian(Ath)
+        Hth = (Ath + Ath') / 2
         F = eigen(Hth)
         m = F.values[end]
         s = findall(≈(m), F.values)
@@ -14,7 +14,7 @@ function numerical_range(A::Matrix, resolution::Number = 0.01)
             pKp = F.vectors[:, s]' * Kth * F.vectors[:, s]
             FF = eigen(pKp)
             mm = FF.values[1]
-            ss = findall(≈(mm), F.values)
+            ss = findall(≈(mm), FF.values)
             p =
                 FF.vectors[:, ss[1]]' *
                 F.vectors[:, s]' *
@@ -23,13 +23,13 @@ function numerical_range(A::Matrix, resolution::Number = 0.01)
                 FF.vectors[:, ss[1]]
             push!(w, tr(p))
             mM = maximum(FF.values[end])
-            sS = findall(≈(mM), F.values)
+            sS = findall(≈(mM), FF.values)
             p =
                 FF.vectors[:, sS[1]]' *
                 F.vectors[:, s]' *
                 A *
                 F.vectors[:, s] *
-                FF.vecotrs[:, sS[1]]
+                FF.vectors[:, sS[1]]
             push!(w, tr(p))
         end
     end

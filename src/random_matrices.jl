@@ -1,15 +1,14 @@
 using Base.Threads
 import MLUtils: unsqueeze
 using CUDA
-import NNlibCUDA: ⊠, batched_adjoint
 
 CUDA.allowscalar(false)
 
 
 function random_pure(::Type{T}, d, batchsize) where {T}
-    ψd = CUDA.randn(T, d, 1, batchsize)
+    ψd = CUDA.randn(T, d, batchsize)
     norm_invs = T.(1 ./ sqrt.(sum(abs.(ψd) .^ 2, dims = 1)))
-    ψd = ψd ⊠ norm_invs
+    ψd = ψd .* norm_invs
     return ψd
 end
 

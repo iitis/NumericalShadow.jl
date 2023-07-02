@@ -8,7 +8,9 @@ function shadow_GPU(A::Matrix, samples::Int, sampling_f, batchsize::Int = 1_000_
     shadow = Hist2D(x_edges, y_edges)
     @showprogress for i = 1:num_batches
         ψd = sampling_f(d, num_batches == 1 ? samples : batchsize)
-        points = dropdims(batched_adjoint(ψd) ⊠ Ad ⊠ ψd, dims = (1, 2))
+        z = Ad * ψd
+        conj!(ψd)
+        points = vec(sum(z .* ψd, dims=1))
         shadow += histogram(real(points), imag(points), x_edges, y_edges)
     end
     return shadow
