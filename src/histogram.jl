@@ -1,3 +1,5 @@
+import LazySets: convex_hull
+
 function numerical_range(A::Matrix, resolution::Number = 0.01)
     w = ComplexF64[]
     for θ = 0:resolution:2pi
@@ -33,7 +35,8 @@ function numerical_range(A::Matrix, resolution::Number = 0.01)
             push!(w, tr(p))
         end
     end
-    return w
+    nr = convex_hull(collect.(collect(zip(real(w), imag(w)))))
+    return reduce(hcat, nr)'
 end
 
 function get_bounding_box_old(A::Matrix)
@@ -45,9 +48,9 @@ function get_bounding_box_old(A::Matrix)
     return mx, Mx, my, My
 end
 
-function get_bounding_box(A::Matrix)
-    nr = numerical_range(A)
-    minimum(real(nr)), maximum(real(nr)), minimum(imag(nr)), maximum(imag(nr))
+function get_bounding_box(A::Matrix, q::Real=1)
+    nr = numerical_range(A) 
+    minimum(nr[:, 1]) / q, maximum(nr[:, 1]) / q, minimum(nr[:, 2]) / q, maximum(nr[:, 2]) / q
 end
 
 function get_bin_edges(A::Matrix, nbins_x::Int, nbins_y::Int = nbins_x)
@@ -61,7 +64,7 @@ mutable struct Hist2D
     x_edges::AbstractVector
     y_edges::AbstractVector
     hist::AbstractMatrix
-    nr::AbstractVector
+    nr::AbstractMatrix
     evs::AbstractVector
     Hist2D(x_edges, y_edges, hist) = new(x_edges, y_edges, hist)
 end

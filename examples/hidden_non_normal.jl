@@ -3,7 +3,7 @@ using LinearAlgebra
 using CUDA
 using ProgressMeter
 
-samples = 10^9
+samples = 10^10
 batchsize = 10^8
 T = ComplexF32
 step = 0.01

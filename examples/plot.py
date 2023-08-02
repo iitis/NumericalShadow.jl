@@ -14,7 +14,7 @@ def plot_stuff(fname):
     nr = data["nr"]
     hist = np.asarray(hist, dtype=np.float64)
     xhist = hist.sum(axis=0)
-    yhist = hist.sum(axis=0)
+    yhist = hist.sum(axis=1)
     hist[hist < 1] = None
     fig = pl.figure(figsize=(6, 6))
 
@@ -24,7 +24,7 @@ def plot_stuff(fname):
 
     ax = fig.add_subplot(gs[1, 0])
     pc = ax.pcolormesh(xedges, yedges, hist)
-    p = pl.Polygon(np.array([data["nr"].real, data["nr"].imag]).T, facecolor="none", 
+    p = pl.Polygon(nr, facecolor="none", 
               edgecolor='red', lw=2)
     ax.add_patch(p)
     ax.scatter(evs.real, evs.imag, color="k", marker="*", s=60)
