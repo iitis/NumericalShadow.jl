@@ -29,10 +29,10 @@ d = 2
 U = rand(d^2, d^2)
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
    shadow = NumericalShadow.qshadow_GPU(U, samples, q, batchsize)
-   shadow.nr = NumericalShadow.numerical_range(A)
-   shadow.evs = eigvals(A)
+   shadow.nr = NumericalShadow.numerical_range(U)
+   shadow.evs = eigvals(U)
    NumericalShadow.save(
         shadow,
-        "$(@__DIR__)/results/qrange$(d).npz",
+        "$(@__DIR__)/results/qrange$(q).npz",
     )
 end
