@@ -1,13 +1,14 @@
+export random_pure, random_overlap
 using CUDA
 
 CUDA.allowscalar(false)
 
 function gram_schmidt_step(x, y)
     d, batchsize = size(x)
-    overlaps = CUDA.zeros(batchsize)
+    overlaps = CUDA.zeros(1, batchsize)
     # <y, x> x
     CUDA.CUBLAS.gemv_strided_batched!('N', 1.0, reshape(y, 1, d, batchsize), x, 1, overlaps)
-    proj = overlaps * x
+    proj = overlaps .* x
     return y - proj
 end
 
@@ -18,11 +19,11 @@ function random_pure(::Type{T}, d, batchsize) where {T}
     return ψd
 end
 
-function random_overlap(::Type{T}, d, batchsize, q::Real)
+function random_overlap(::Type{T}, d, batchsize, q::Real) where {T}
     x = random_pure(T, d, batchsize)
     y = random_pure(T, d, batchsize)
     xp = gram_schmidt_step(x, y)
-    return sqrt(1 - q^2) * xp + q * x
+    return sqrt(1 - q^2) * xp + q * x, x
 end
 
 function random_unitary(d, batchsize) end
