@@ -1,4 +1,6 @@
+using LinearAlgebra
 import LazySets: convex_hull
+import Combinatorics: combinations
 
 function numerical_range(A::Matrix, resolution::Number = 0.01)
     w = ComplexF64[]
@@ -39,34 +41,66 @@ function numerical_range(A::Matrix, resolution::Number = 0.01)
     return reduce(hcat, nr)'
 end
 
-function circle_boundary(r::Real, n::Int, c::Vector{Real} = [0., 0.])
+side(point, v1, v2) = (point[1] - v2[1]) * (v1[2] - v2[2]) - (v1[1] - v2[1]) * (point[2] - v2[2])
+
+function in_triangle(point, triangle)
+    side_tests = [side(point, vertices...) for vertices in combinations(triangle, 2)]
+    # all(x->x>0, side_tests)
+    all(x->x<0, side_tests)
+end
+
+function circle(r::Real, n::Int, c::Vector{<:Real} = [0., 0.])
     t = LinRange(0, 2π, n)
     x = c[1] .+ r * cos.(t)
     y = c[2] .+ r * sin.(t)
-    return x, y
+    collect.(eachrow(hcat(x, y)))
 end
 
-circle_boundary(r::Real, n::Int, c::ComplexF64) = circle_boundary([real(c), imag(c)], r, n)
+circle(r::Real, n::Int, c::ComplexF64) = circle([real(c), imag(c)], r, n)
 
-function ellipse_boundary(f1, f2, e, n)
+function ellipse(f1, f2, e, n)
     t = LinRange(0, 2π, n)
     z = (f1-f2)/2;
     c = abs(z);
     r = angle(z);
     a = c/e;
     b = sqrt(a^2 - c^2);
-    z1 = (u+v)/2;
+    z1 = (f1+f2)/2;
     p = real(z1);
     q = imag(z1);
 
-    x = a * cos.(r) * cos.(t) .- b * sin(r) * sin(t) .+ p
-    y = a * sin.(r) * cos.(t) .+ b * cos(r) * sin(t) .+ q
+    x = a * cos.(r) * cos.(t) .- b * sin(r) * sin.(t) .+ p
+    y = a * sin.(r) * cos.(t) .+ b * cos(r) * sin.(t) .+ q
 
-    return x, y
+    collect.(eachrow(hcat(x, y)))
 end
 
-function qrange(A, q::Real=1)
+function subrange(q::Real, n::Int, evs::Vector)
+    @assert length(evs) == 3
+    qevs = q * evs
+    points = Vector{Float64}[]
+    for comb in combinations(qevs, 2)
+        append!(points, ellipse(comb[1], comb[2], q, n))
+    end
+    small_circle = circle(q, n)
+    unit_circle = circle(1, n)
+    triangle = collect.(eachrow(hcat(real.(evs), imag(evs))))
+    mask = in_triangle.(small_circle, Ref(triangle))
+    for (i, m) in enumerate(mask)
+        m && push!(points, unit_circle[i])
+    end
+    return points
+end
+
+function qrange(A, q::Real=1, n::Int=1000)
     q == 1 && return numerical_range(A)
-
-
+    @assert A' * A ≈ I "Only unitary matrices supported"
+    evs = unique(eigvals(A))
+    length(evs) == 2 && return convex_hull(ellipse(q*evs[1], q*evs[2], q, n))
+    points = Vector{Float64}[]
+    for comb in combinations(evs, 3)
+        sort!(comb, by=angle)
+        append!(points, subrange(q, n, comb))
+    end
+    return reduce(hcat, convex_hull(points))'
 end
