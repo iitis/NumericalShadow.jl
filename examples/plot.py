@@ -12,6 +12,9 @@ def plot_stuff(fname):
     hist = data["hist"].T
     evs = data["evs"]
     nr = data["nr"]
+    other_range = None
+    if "other_range" in data.files:
+        other_range = data["other_range"]
     hist = np.asarray(hist, dtype=np.float64)
     xhist = hist.sum(axis=0)
     yhist = hist.sum(axis=1)
@@ -27,6 +30,9 @@ def plot_stuff(fname):
     p = pl.Polygon(nr, facecolor="none", 
               edgecolor='red', lw=2)
     ax.add_patch(p)
+    if other_range is not None:
+        op = pl.Polygon(other_range, facecolor="none", edgecolor="blue", lw=2)
+        ax.add_patch(op)
     ax.scatter(evs.real, evs.imag, color="k", marker="*", s=60)
     # ax.set_xlim(xedges[0], xedges[-1])
     # ax.set_ylim(yedges[0], yedges[-1])
