@@ -1,44 +1,3 @@
-import LazySets: convex_hull
-
-function numerical_range(A::Matrix, resolution::Number = 0.01)
-    w = ComplexF64[]
-    for θ = 0:resolution:2pi
-        Ath = exp(1im * -θ) * A
-        Hth = (Ath + Ath') / 2
-        F = eigen(Hth)
-        m = F.values[end]
-        s = findall(≈(m), F.values)
-        if length(s) == 1
-            p = F.vectors[:, s]' * A * F.vectors[:, s]
-            push!(w, tr(p))
-        else
-            Kth = 1im * (Hth - Ath)
-            pKp = F.vectors[:, s]' * Kth * F.vectors[:, s]
-            FF = eigen(pKp)
-            mm = FF.values[1]
-            ss = findall(≈(mm), FF.values)
-            p =
-                FF.vectors[:, ss[1]]' *
-                F.vectors[:, s]' *
-                A *
-                F.vectors[:, s] *
-                FF.vectors[:, ss[1]]
-            push!(w, tr(p))
-            mM = maximum(FF.values[end])
-            sS = findall(≈(mM), FF.values)
-            p =
-                FF.vectors[:, sS[1]]' *
-                F.vectors[:, s]' *
-                A *
-                F.vectors[:, s] *
-                FF.vectors[:, sS[1]]
-            push!(w, tr(p))
-        end
-    end
-    nr = convex_hull(collect.(collect(zip(real(w), imag(w)))))
-    return reduce(hcat, nr)'
-end
-
 function get_bounding_box_old(A::Matrix)
     reA = Hermitian(A + A' / 2)
     imA = Hermitian(-1im * (A - A') / 2.0)
@@ -53,7 +12,7 @@ function get_bounding_box(A::Matrix, q::Real=1)
     minimum(nr[:, 1]) / q, maximum(nr[:, 1]) / q, minimum(nr[:, 2]) / q, maximum(nr[:, 2]) / q
 end
 
-function get_bin_edges(A::Matrix, nbins_x::Int, nbins_y::Int = nbins_x, q::Real=1)
+function get_bin_edges(A::Matrix, nbins_x::Int, q::Real=1, nbins_y::Int = nbins_x)
     min_x, max_x, min_y, max_y = get_bounding_box(A)
     x_edges = min_x:(max_x-min_x)/nbins_x:max_x
     y_edges = min_y:(max_y-min_y)/nbins_y:max_y

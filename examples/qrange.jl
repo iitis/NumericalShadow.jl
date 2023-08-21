@@ -5,8 +5,8 @@ using ProgressMeter
 
 function LinearAlgebra.kron!(z::CuMatrix, x::CuMatrix, y::CuMatrix)
     function kernel(z, x, y)
-        i = threadIdx().x + (blockIdx().x - 1) * gridDim().x
-        if i <= size(x, 2)
+        i = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+        if i <= size(z, 2)
             d1 = size(x, 1)
             d2 = size(y, 1)
             for k=1:d1, l=1:d2
@@ -22,17 +22,17 @@ function LinearAlgebra.kron!(z::CuMatrix, x::CuMatrix, y::CuMatrix)
     @cuda threads=threads blocks=blocks kernel(z, x, y)
 end
 
-samples = 10^10
+samples = 10^8
 batchsize = 10^8
 T = ComplexF32
 d = 2
-U = rand(d^2, d^2)
+U = Array(qr(rand(ComplexF32, d^2, d^2)).Q)
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
    shadow = NumericalShadow.qshadow_GPU(U, samples, q, batchsize)
    shadow.nr = NumericalShadow.numerical_range(U)
    shadow.evs = eigvals(U)
    NumericalShadow.save(
         shadow,
-        "$(@__DIR__)/results/qrange$(q).npz",
+        "$(@__DIR__)/results/qrange_$(rpad(q, 4, "0")).npz",
     )
 end

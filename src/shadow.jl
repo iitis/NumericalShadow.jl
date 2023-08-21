@@ -20,7 +20,7 @@ function qshadow_GPU(A::Matrix, samples::Int, q::Real, batchsize::Int = 1_000_00
     num_batches = div(samples, batchsize)
     d = isqrt(size(A, 1))
     Ad = cu(A)
-    x_edges, y_edges = cu.(collect.(get_bin_edges(A, 1000)))
+    x_edges, y_edges = cu.(collect.(get_bin_edges(A, 1000, q)))
     shadow = Hist2D(x_edges, y_edges)
     @showprogress for i = 1:num_batches
         xq, x = random_overlap(Float32, d, num_batches == 1 ? samples : batchsize, sqrt(q))
