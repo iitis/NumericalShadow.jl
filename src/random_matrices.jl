@@ -5,9 +5,11 @@ CUDA.allowscalar(false)
 
 function gram_schmidt_step(x, y)
     d, batchsize = size(x)
-    overlaps = CUDA.zeros(1, batchsize)
+    overlaps = CUDA.zeros(eltype(x), 1, batchsize)
     # <y, x> x
+    conj!(x)
     CUDA.CUBLAS.gemv_strided_batched!('N', 1.0, reshape(y, 1, d, batchsize), x, 1, overlaps)
+    conj!(x)
     proj = overlaps .* x
     return y - proj
 end

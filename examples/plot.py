@@ -48,6 +48,7 @@ def plot_stuff(fname):
     # ax_histy.set_yticks([])
     fig.suptitle(f'{fname.stem}', fontsize=16)
     fig.savefig(f"{fname.parent / fname.stem}.png")
+    pl.close()
 
 
 glob = list(Path("results/").glob("*.npz"))

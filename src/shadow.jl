@@ -35,17 +35,17 @@ function shadow_GPU(A::Matrix, samples::Int, sampling_f, batchsize::Int = 1_000_
     return shadow
 end
 
-function product_qshadow_GPU(A::Matrix, samples::Int, q::Real, batchsize::Int = 1_000_000)
+function product_qshadow_GPU(::Type{T}, A::Matrix, samples::Int, q::Real, batchsize::Int = 1_000_000) where {T}
     num_batches = div(samples, batchsize)
     d = isqrt(size(A, 1))
     Ad = cu(A)
     x_edges, y_edges = cu.(collect.(get_bin_edges(A, 1000, q)))
     shadow = Hist2D(x_edges, y_edges)
     @showprogress for i = 1:num_batches
-        xq, x = random_overlap(Float32, d, num_batches == 1 ? samples : batchsize, sqrt(q))
-        yq, y = random_overlap(Float32, d, num_batches == 1 ? samples : batchsize, sqrt(q))
-        zq = CUDA.zeros(d*d, batchsize)
-        z = CUDA.zeros(d*d, batchsize)
+        xq, x = random_overlap(T, d, num_batches == 1 ? samples : batchsize, sqrt(q))
+        yq, y = random_overlap(T, d, num_batches == 1 ? samples : batchsize, sqrt(q))
+        zq = CUDA.zeros(T, d*d, batchsize)
+        z = CUDA.zeros(T, d*d, batchsize)
         kron!(zq, xq, yq)
         kron!(z, x, y)
         p = Ad * z
@@ -56,14 +56,14 @@ function product_qshadow_GPU(A::Matrix, samples::Int, q::Real, batchsize::Int = 
     return shadow
 end
 
-function qshadow_GPU(A::Matrix, samples::Int, q::Real, batchsize::Int = 1_000_000)
+function qshadow_GPU(::Type{T}, A::Matrix, samples::Int, q::Real, batchsize::Int = 1_000_000) where {T}
     num_batches = div(samples, batchsize)
     d = size(A, 1)
     Ad = cu(A)
     x_edges, y_edges = cu.(collect.(get_bin_edges(A, 1000, q)))
     shadow = Hist2D(x_edges, y_edges)
     @showprogress for i = 1:num_batches
-        zq, z = random_overlap(Float32, d, num_batches == 1 ? samples : batchsize, q)
+        zq, z = random_overlap(T, d, num_batches == 1 ? samples : batchsize, q)
         p = Ad * z
         conj!(zq)
         points = vec(sum(p .* zq, dims=1))

@@ -8,15 +8,15 @@ function get_bounding_box_old(A::Matrix)
 end
 
 function get_bounding_box(A::Matrix, q::Real=1)
-    nr = numerical_range(A) 
-    minimum(nr[:, 1]) / q, maximum(nr[:, 1]) / q, minimum(nr[:, 2]) / q, maximum(nr[:, 2]) / q
+    nr = qrange(A, q) 
+    minimum(nr[:, 1]), maximum(nr[:, 1]), minimum(nr[:, 2]), maximum(nr[:, 2])
 end
 
 function get_bin_edges(A::Matrix, nbins_x::Int, q::Real=1, nbins_y::Int = nbins_x)
-    min_x, max_x, min_y, max_y = get_bounding_box(A)
+    min_x, max_x, min_y, max_y = get_bounding_box(A, q)
     x_edges = min_x:(max_x-min_x)/nbins_x:max_x
     y_edges = min_y:(max_y-min_y)/nbins_y:max_y
-    x_edges ./ q, y_edges ./ q
+    x_edges, y_edges
 end
 
 mutable struct Hist2D
