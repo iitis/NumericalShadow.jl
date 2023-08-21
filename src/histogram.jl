@@ -25,6 +25,7 @@ mutable struct Hist2D
     hist::AbstractMatrix
     nr::AbstractMatrix
     evs::AbstractVector
+    other_range::AbstractMatrix
     Hist2D(x_edges, y_edges, hist) = new(x_edges, y_edges, hist)
 end
 
@@ -45,15 +46,19 @@ function Base.:+(h1::Hist2D, h2::Hist2D)
 end
 
 function save(h::Hist2D, fname::String)
+    d = Dict(
+        "x_edges" => Array(h.x_edges),
+        "y_edges" => Array(h.y_edges),
+        "hist" => Array(h.hist),
+        "nr" => Array(h.nr),
+        "evs" => Array(h.evs),
+    )
+    if isdefined(h, :other_range)
+        d["other_range"] = Array(h.other_range)
+    end
     NPZ.npzwrite(
         fname,
-        Dict(
-            "x_edges" => Array(h.x_edges),
-            "y_edges" => Array(h.y_edges),
-            "hist" => Array(h.hist),
-            "nr" => Array(h.nr),
-            "evs" => Array(h.evs),
-        ),
+        d
     )
 end
 
