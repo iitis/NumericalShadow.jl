@@ -31,7 +31,7 @@ end
      )
  end
 
- samples = 10^8
+samples = 10^8
 batchsize = 10^8
 T = Float32
 d = 2
