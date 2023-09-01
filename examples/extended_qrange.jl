@@ -14,8 +14,8 @@ function swap(n, perm)
     return U
 end
 
-samples = 10^6
-batchsize = 10^6
+samples = 10^10
+batchsize = 10^7
 T = ComplexF32
 n = 4
 S = swap(n, [3, 1, 2, 4])
@@ -23,27 +23,27 @@ U1 = S*kron(Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/
 U = Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/3)]))
 U = kron(kron(I(2), U), I(2))
 
-@showprogress 2 "Iteratring q" for q=0.01:0.01:1
-   shadow = NumericalShadow.qshadow_GPU(T, U, samples, q, batchsize)
-   shadow.nr = NumericalShadow.numerical_range(U)
-   shadow.evs = eigvals(U)
-   shadow.other_range = NumericalShadow.qrange(U, q)
-   NumericalShadow.save(
-        shadow,
-        "$(@__DIR__)/results/extended_qshadow_complex_$(rpad(q, 4, "0")).npz",
-    )
-end
+# @showprogress 2 "Iteratring q" for q=0.01:0.01:1
+#    shadow = NumericalShadow.qshadow_GPU(T, U, samples, q, batchsize)
+#    shadow.nr = NumericalShadow.numerical_range(U)
+#    shadow.evs = eigvals(U)
+#    shadow.other_range = NumericalShadow.qrange(U, q)
+#    NumericalShadow.save(
+#         shadow,
+#         "$(@__DIR__)/results/extended_qshadow_complex_$(rpad(q, 4, "0")).npz",
+#     )
+# end
 
-@showprogress 2 "Iteratring q" for q=0.01:0.01:1
-    shadow = NumericalShadow.product_qshadow_GPU(T, U, samples, q, batchsize)
-    shadow.nr = NumericalShadow.numerical_range(U)
-    shadow.evs = eigvals(U)
-    shadow.other_range = NumericalShadow.qrange(U, q)
-    NumericalShadow.save(
-         shadow,
-         "$(@__DIR__)/results/extended_product_qshadow_complex_$(rpad(q, 4, "0")).npz",
-     )
- end
+# @showprogress 2 "Iteratring q" for q=0.01:0.01:1
+#     shadow = NumericalShadow.product_qshadow_GPU(T, U, samples, q, batchsize)
+#     shadow.nr = NumericalShadow.numerical_range(U)
+#     shadow.evs = eigvals(U)
+#     shadow.other_range = NumericalShadow.qrange(U, q)
+#     NumericalShadow.save(
+#          shadow,
+#          "$(@__DIR__)/results/extended_product_qshadow_complex_$(rpad(q, 4, "0")).npz",
+#      )
+#  end
 
 T = Float32
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
