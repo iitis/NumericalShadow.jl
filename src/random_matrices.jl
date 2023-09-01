@@ -28,7 +28,16 @@ function random_overlap(::Type{T}, d, batchsize, q::Real) where {T}
     return sqrt(1 - q^2) * xp + q * x, x
 end
 
-function random_unitary(d, batchsize) end
+function random_unitary(d, batchsize)
+    g = CUDA.randn(d, d, batchsize)
+    q, r = CUBLAS.geqrf_batched!([view(g, :, :, i) for i=1:batchsize])
+    rr = r[1]
+    rr = tril(rr)
+    rr[diagind(rr)] = 1
+    pp = proj.(eachcol(rr))
+    qq = prod([CuArray(I, 4, 4) - pp[i] * q[1][i] for i=1:4]) # this is the q for the first matrix in batch
+    proper_r = triu(r[1])
+end
 
 function random_max_ent(d, batchsize)
     x = CUDA.randn(ComplexF32, d, d, batchsize)
