@@ -29,6 +29,28 @@ function random_overlap(::Type{T}, d, batchsize, q::Real) where {T}
 end
 
 function random_unitary(d, batchsize)
+
+    function cat_kernel(C, vs)
+        i = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+        i > length(vs) && return
+        C[:, :, i] = vs[i]
+        return
+    end
+
+    function outer_prod_kernel(C, A, B)
+        #this probably can be impreoved using shared memory
+        idx = threadIdx().x + (blockIdx().x - 1) * blockDim().x
+        mx, my, _ = size(C)
+        idx > prod(size(C)) && return
+        i = mod1(idx, mx)
+        idx = cld(idx, mx)
+        j = mod1(idx, my)
+        idx = cld(idx, my)
+        k = idx
+        C[i, j, k] = A[i, k] * B[j, k]
+        return
+    end
+
     g = CUDA.randn(d, d, batchsize)
     q, r = CUBLAS.geqrf_batched!([view(g, :, :, i) for i=1:batchsize])
     rr = r[1]
