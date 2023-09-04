@@ -1,5 +1,6 @@
-export random_pure, random_overlap
-using CUDA
+export random_pure, random_overlap, random_unitary, random_max_ent
+using CUDA, LinearAlgebra
+using TensorCast
 
 CUDA.allowscalar(false)
 
@@ -28,42 +29,33 @@ function random_overlap(::Type{T}, d, batchsize, q::Real) where {T}
     return sqrt(1 - q^2) * xp + q * x, x
 end
 
-function random_unitary(d, batchsize)
-
-    function cat_kernel(C, vs)
-        i = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-        i > length(vs) && return
-        C[:, :, i] = vs[i]
-        return
+function random_unitary(::Type{T}, d, batchsize) where {T}
+    g = CUDA.randn(T, d, d, batchsize)
+    _tau, _r = CUBLAS.geqrf_batched!([view(g, :, :, i) for i=1:batchsize])
+    r = CUDA.zeros(T, d, d, batchsize)
+    tau = CUDA.zeros(T, d, batchsize)
+    correction_factors = CUDA.zeros(T, d, batchsize)
+    CUDA.@time @views Threads.@threads for i=1:batchsize
+        correction_factors[:, i] = sign.(diag(_r[i]))
+        _r[i][diagind(_r[i])] .= 1
+        r[:, :, i] = tril(_r[i])
+        tau[:, i] = _tau[i]
     end
-
-    function outer_prod_kernel(C, A, B)
-        #this probably can be impreoved using shared memory
-        idx = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-        mx, my, _ = size(C)
-        idx > prod(size(C)) && return
-        i = mod1(idx, mx)
-        idx = cld(idx, mx)
-        j = mod1(idx, my)
-        idx = cld(idx, my)
-        k = idx
-        C[i, j, k] = A[i, k] * B[j, k]
-        return
+    id = CuArray(I, d, d)
+    @cast b[k, l, i, m] := id - r[k, i, m] * conj(r[l, i, m]) * tau[i, m]
+    Q = CUDA.zeros(T, d, d, batchsize)
+    CUDA.@time @views Threads.@threads for i=1:batchsize
+        Q[:, :, i] = b[:, :, 1, i] * b[:, :, 2, i]
+        for j=3:size(b,  3)
+            Q[:, :, i] *= b[:, :, j, i]
+        end
     end
-
-    g = CUDA.randn(d, d, batchsize)
-    q, r = CUBLAS.geqrf_batched!([view(g, :, :, i) for i=1:batchsize])
-    rr = r[1]
-    rr = tril(rr)
-    rr[diagind(rr)] = 1
-    pp = proj.(eachcol(rr))
-    qq = prod([CuArray(I, 4, 4) - pp[i] * q[1][i] for i=1:4]) # this is the q for the first matrix in batch
-    proper_r = triu(r[1])
+    @cast Q[i, j, k] = Q[i, j, k] * correction_factors[i, k]
+    return Q
 end
 
-function random_max_ent(d, batchsize)
-    x = CUDA.randn(ComplexF32, d, d, batchsize)
-    tau, A = CUDA.CUBLAS.geqrf_batched(collect(eachslice(x, dims = 3)))
-    q, r = reconstruct_qr(tau, A)
-    return qr_fix!(q, r)
+function random_max_ent(::Type{T}, d, batchsize) where {T}
+    Q = random_unitary(T, d, batchsize)
+    ψ = reduce(hcat, vec.(eachslice(Q; dims=3))) ./ d
+    return ψ
 end
