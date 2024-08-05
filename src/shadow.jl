@@ -72,6 +72,22 @@ function qshadow_GPU(::Type{T}, A::Matrix, samples::Int, q::Real, batchsize::Int
     return shadow
 end
 
+function product_shadow_GPU(::Type{T}, A::Matrix, samples::Int, batchsize::Int = 1_000_000) where {T}
+    num_batches = div(samples, batchsize)
+    d = isqrt(size(A, 1))
+    Ad = cu(A)
+    x_edges, y_edges = cu.(collect.(get_bin_edges(A, 1000)))
+    shadow = Hist2D(x_edges, y_edges)
+    @showprogress for i = 1:num_batches
+        ψd = sampling_f(d, num_batches == 1 ? samples : batchsize)
+        z = Ad * ψd
+        conj!(ψd)
+        points = vec(sum(z .* ψd, dims=1))
+        shadow += histogram(real(points), imag(points), x_edges, y_edges)
+    end
+    return shadow
+end
+
 # function max_entangled_shadow(A::Matrix, samples::Int)
 #     # Generate a random pure state
 #     d = isqrt(size(A, 1))
