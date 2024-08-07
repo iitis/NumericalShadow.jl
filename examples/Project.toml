@@ -1,0 +1,6 @@
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+NumericalShadow = "cf08b3b2-491f-4659-a90e-a7afc6df83ad"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+QuantumInformation = "3c0b384b-479c-5684-b2ef-9d7a46dd931e"

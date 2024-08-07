@@ -1,32 +1,14 @@
+export shadow_GPU
 using ProgressMeter
 
-function LinearAlgebra.kron!(z::CuMatrix, x::CuMatrix, y::CuMatrix)
-    function kernel(z, x, y)
-        i = threadIdx().x + (blockIdx().x - 1) * blockDim().x
-        if i <= size(z, 2)
-            d1 = size(x, 1)
-            d2 = size(y, 1)
-            for k=1:d1, l=1:d2
-                z[(k-1)*d2+l, i] = x[k, i] * y[l, i]
-            end
-        end
-        return
-    end
-    @assert size(z, 2) == size(x, 2) == size(y, 2)
-    @assert size(z, 1) == size(x, 1) * size(y, 1)
-    threads = 512
-    blocks = cld(size(x, 2), threads)
-    @cuda threads=threads blocks=blocks kernel(z, x, y)
-end
-
-function shadow_GPU(A::Matrix, samples::Int, sampling_f, batchsize::Int = 1_000_000)
+function shadow_GPU(::Type{T}, A::Matrix, samples::Int, sampling_f, batchsize::Int = 1_000_000) where {T}
     num_batches = div(samples, batchsize)
     d = size(A, 1)
     Ad = cu(A)
     x_edges, y_edges = cu.(collect.(get_bin_edges(A, 1000)))
     shadow = Hist2D(x_edges, y_edges)
     @showprogress for i = 1:num_batches
-        ψd = sampling_f(d, num_batches == 1 ? samples : batchsize)
+        ψd = sampling_f(T, d, num_batches == 1 ? samples : batchsize)
         z = Ad * ψd
         conj!(ψd)
         points = vec(sum(z .* ψd, dims=1))
@@ -46,8 +28,8 @@ function product_qshadow_GPU(::Type{T}, A::Matrix, samples::Int, q::Real, batchs
         yq, y = random_overlap(T, d, num_batches == 1 ? samples : batchsize, sqrt(q))
         zq = CUDA.zeros(T, d*d, batchsize)
         z = CUDA.zeros(T, d*d, batchsize)
-        kron!(zq, xq, yq)
-        kron!(z, x, y)
+        my_kron!(zq, xq, yq)
+        my_kron!(z, x, y)
         p = Ad * z
         conj!(zq)
         points = vec(sum(p .* zq, dims=1))
@@ -67,22 +49,6 @@ function qshadow_GPU(::Type{T}, A::Matrix, samples::Int, q::Real, batchsize::Int
         p = Ad * z
         conj!(zq)
         points = vec(sum(p .* zq, dims=1))
-        shadow += histogram(real(points), imag(points), x_edges, y_edges)
-    end
-    return shadow
-end
-
-function product_shadow_GPU(::Type{T}, A::Matrix, samples::Int, batchsize::Int = 1_000_000) where {T}
-    num_batches = div(samples, batchsize)
-    d = isqrt(size(A, 1))
-    Ad = cu(A)
-    x_edges, y_edges = cu.(collect.(get_bin_edges(A, 1000)))
-    shadow = Hist2D(x_edges, y_edges)
-    @showprogress for i = 1:num_batches
-        ψd = sampling_f(d, num_batches == 1 ? samples : batchsize)
-        z = Ad * ψd
-        conj!(ψd)
-        points = vec(sum(z .* ψd, dims=1))
         shadow += histogram(real(points), imag(points), x_edges, y_edges)
     end
     return shadow
