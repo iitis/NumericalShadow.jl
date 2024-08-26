@@ -46,12 +46,17 @@ function Base.:+(h1::Hist2D, h2::Hist2D)
 end
 
 function save(h::Hist2D, fname::String)
+    all_points = collect(Iterators.product(Array(h.x_edges), Array(h.y_edges)))
+    origin_dist, idx = findmin(x->sqrt(x[1]^2 + x[2]^2), all_points)
+    nearest_point = collect(all_points[idx])
     d = Dict(
         "x_edges" => Array(h.x_edges),
         "y_edges" => Array(h.y_edges),
         "hist" => Array(h.hist),
         "nr" => Array(h.nr),
         "evs" => Array(h.evs),
+        "origin_dist" => origin_dist,
+        "nearest_point" => nearest_point
     )
     if isdefined(h, :other_range)
         d["other_range"] = Array(h.other_range)

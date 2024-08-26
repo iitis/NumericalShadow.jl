@@ -4,8 +4,17 @@ from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool
 
+FOR_PLOT = {
+    "product_shadow_reflection_d=9_0.00": "0",
+    "product_shadow_reflection_d=9_0.50": "0.5",
+    "product_shadow_reflection_d=9_0.75": "0.75",
+    "product_shadow_reflection_d=9_1.00": "1",
+}
 
 def plot_stuff(fname):
+    if fname.stem not in FOR_PLOT.keys():
+        return None
+    print(fname)
     data = np.load(fname)
     xedges = data["x_edges"]
     yedges = data["y_edges"]
@@ -50,8 +59,9 @@ def plot_stuff(fname):
     ax_histy.plot(yhist, yedges[:-1])
     ax_histy.set_xticks([])
     # ax_histy.set_yticks([])
-    fig.suptitle(f'{fname.stem}', fontsize=16)
-    fig.savefig(f"{fname.parent / fname.stem}.png")
+    fig.suptitle(f'$\\alpha={FOR_PLOT[fname.stem]}$', fontsize=16)
+    ofile = fname.parent / "for_paper" / f"{fname.stem}.png"
+    fig.savefig(ofile)
     pl.close()
 
 
