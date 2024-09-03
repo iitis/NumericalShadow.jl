@@ -34,8 +34,6 @@ def plot_stuff(fname):
         op = pl.Polygon(other_range, facecolor="none", edgecolor="blue", lw=2)
         ax.add_patch(op)
     ax.scatter(evs.real, evs.imag, color="k", marker="*", s=60)
-    # ax.set_xlim(xedges[0], xedges[-1])
-    # ax.set_ylim(yedges[0], yedges[-1])
     circle = pl.Circle((0, 0), 1, edgecolor='black', facecolor='none', linestyle='--')
     ax.add_patch(circle)
     ax.scatter(0, 0, color='green', marker='*', s=60)

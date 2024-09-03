@@ -1,8 +1,11 @@
 import numpy as np
-import pylab as pl
+import matplotlib.pyplot as pl
 from tqdm import tqdm
 from pathlib import Path
 from multiprocessing import Pool
+pl.rcParams.update({
+    "text.usetex": True,
+})
 
 FOR_PLOT = {
     "product_shadow_reflection_d=9_0.00": "0",
