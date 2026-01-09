@@ -3,13 +3,41 @@ uuid = "cf08b3b2-491f-4659-a90e-a7afc6df83ad"
 version = "0.0.1"
 
 [deps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Atomix = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
 Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 LazySets = "b4f0291d-fe17-52bc-9479-3d1a343d9043"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
-StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+TensorCast = "02d47bb6-7ce6-556a-be16-bb1710789e2b"
+
+[weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+
+[extensions]
+NumericalShadowCUDAExt = "CUDA"
 
 [compat]
-julia = "1.9"
+Aqua = "0.8"
+Atomix = "1"
+CUDA = "5"
+Combinatorics = "1"
+KernelAbstractions = "0.9"
+LazySets = "2"
+LinearAlgebra = "1"
+NPZ = "0.4"
+ProgressMeter = "1"
+StatsBase = "0.34.9"
+TensorCast = "0.4"
+Test = "1"
+julia = "1.11, 1.12"
+
+[extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Aqua", "CUDA", "StatsBase", "Test"]

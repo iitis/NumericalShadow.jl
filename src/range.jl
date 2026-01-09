@@ -96,7 +96,8 @@ function qrange(A, q::Real=1, n::Int=1000)
     q == 1 && return numerical_range(A)
     @assert A' * A ≈ I "Only unitary matrices supported"
     evs = unique(eigvals(A))
-    length(evs) == 2 && return convex_hull(ellipse(q*evs[1], q*evs[2], q, n))
+    length(evs) == 1 && return q * [real(evs[1]) imag(evs[1])]
+    length(evs) == 2 && return reduce(hcat, convex_hull(ellipse(q*evs[1], q*evs[2], q, n)))'
     points = Vector{Float64}[]
     for comb in combinations(evs, 3)
         sort!(comb, by=angle)

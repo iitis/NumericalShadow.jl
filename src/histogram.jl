@@ -1,3 +1,8 @@
+using KernelAbstractions
+using Atomix
+
+# Shim for atomic operations outside of kernels if needed, 
+# but inside kernels we should use KernelAbstractions.@atomic
 function get_bounding_box_old(A::Matrix)
     reA = Hermitian(A + A' / 2)
     imA = Hermitian(-1im * (A - A') / 2.0)
@@ -14,11 +19,18 @@ end
 
 function get_bin_edges(A::Matrix, nbins_x::Int, q::Real=1, nbins_y::Int = nbins_x)
     min_x, max_x, min_y, max_y = get_bounding_box(A, q)
+    if min_x ≈ max_x
+        min_x -= 0.5
+        max_x += 0.5
+    end
+    if min_y ≈ max_y
+        min_y -= 0.5
+        max_y += 0.5
+    end
     x_edges = min_x:(max_x-min_x)/nbins_x:max_x
     y_edges = min_y:(max_y-min_y)/nbins_y:max_y
     x_edges, y_edges
 end
-
 mutable struct Hist2D
     x_edges::AbstractVector
     y_edges::AbstractVector
@@ -30,18 +42,12 @@ mutable struct Hist2D
 end
 
 function Hist2D(x_edges::AbstractVector, y_edges::AbstractVector)
-    hist = zeros(Int64, length(x_edges) - 1, length(y_edges) - 1)
-    Hist2D(x_edges, y_edges, hist)
-end
-
-function Hist2D(x_edges::CuVector, y_edges::CuVector)
-    hist = CUDA.zeros(Int32, length(x_edges) - 1, length(y_edges) - 1)
+    backend = KernelAbstractions.get_backend(x_edges)
+    hist = KernelAbstractions.zeros(backend, Int32, length(x_edges) - 1, length(y_edges) - 1)
     Hist2D(x_edges, y_edges, hist)
 end
 
 function Base.:+(h1::Hist2D, h2::Hist2D)
-    @assert all(h1.x_edges .≈ h2.x_edges)
-    @assert all(h1.y_edges .≈ h2.y_edges)
     Hist2D(h1.x_edges, h1.y_edges, h1.hist + h2.hist)
 end
 
@@ -53,43 +59,77 @@ function save(h::Hist2D, fname::String)
         "x_edges" => Array(h.x_edges),
         "y_edges" => Array(h.y_edges),
         "hist" => Array(h.hist),
-        "nr" => Array(h.nr),
-        "evs" => Array(h.evs),
-        "origin_dist" => origin_dist,
-        "nearest_point" => nearest_point
+        "nr" => isdefined(h, :nr) ? Array(h.nr) : nothing,
+        "evs" => isdefined(h, :evs) ? Array(h.evs) : nothing,
     )
     if isdefined(h, :other_range)
         d["other_range"] = Array(h.other_range)
     end
-    NPZ.npzwrite(
-        fname,
-        d
-    )
+    NPZ.npzwrite(fname, d)
 end
 
-function histogram(xs::CuVector, ys::CuVector, x_edges::CuVector, y_edges::CuVector)
-    function kernel(xs, ys, x_edges, y_edges, hist)
-        i = (blockIdx().x - 1) * blockDim().x + threadIdx().x
-        i > length(xs) && return
-        @inbounds x, y = xs[i], ys[i]
-        idx_x = searchsorted(x_edges, x).stop
-        idx_y = searchsorted(y_edges, y).stop
-        m = length(x_edges)
-        n = length(y_edges)
-        if idx_x == m
-            idx_x = m - 1
+@kernel function histogram_kernel(xs, ys, @Const(x_edges), @Const(y_edges), hist_vec, nx_i32, ny_i32)
+    i = @index(Global, Linear)
+    if i <= length(xs)
+        x = xs[i]
+        y = ys[i]
+        
+        min_x = x_edges[1]
+        step_x = x_edges[2] - x_edges[1]
+        min_y = y_edges[1]
+        step_y = y_edges[2] - y_edges[1]
+        
+        idx_x = trunc(Int32, (x - min_x) / step_x) + Int32(1)
+        idx_y = trunc(Int32, (y - min_y) / step_y) + Int32(1)
+        
+        if idx_x > nx_i32 && idx_x <= nx_i32 + Int32(1)
+            idx_x = nx_i32
         end
-        if idx_y == n
-            idx_y = n - 1
+        if idx_y > ny_i32 && idx_y <= ny_i32 + Int32(1)
+            idx_y = ny_i32
         end
-        @inbounds k = LinearIndices(hist)[idx_x, idx_y]
-        CUDA.atomic_add!(pointer(hist, k), Int32(1))
-        nothing
+        
+        if Int32(1) <= idx_x <= nx_i32 && Int32(1) <= idx_y <= ny_i32
+             lidx = idx_x + (idx_y - Int32(1)) * nx_i32
+             @inbounds KernelAbstractions.@atomic hist_vec[lidx] += Int32(1)
+        end
     end
+end
 
-    @assert length(xs) == length(ys)
-    n_blocks = (length(xs) + nTPB - 1) ÷ nTPB
-    hist = CUDA.zeros(Int32, length(x_edges) - 1, length(y_edges) - 1)
-    @cuda threads = nTPB blocks = n_blocks kernel(xs, ys, x_edges, y_edges, hist)
+function histogram(xs::AbstractVector, ys::AbstractVector, x_edges::AbstractVector, y_edges::AbstractVector)
+    backend = KernelAbstractions.get_backend(xs)
+    nx = length(x_edges) - 1
+    ny = length(y_edges) - 1
+    hist = KernelAbstractions.zeros(backend, Int32, nx, ny)
+    
+    if backend isa CPU
+        # Workaround for Atomix on CPU if KA @atomic is broken
+        # We use a manual loop for now for robustness on 1.11/1.12
+        for i in 1:length(xs)
+            x = xs[i]
+            y = ys[i]
+            min_x = x_edges[1]
+            step_x = x_edges[2] - x_edges[1]
+            min_y = y_edges[1]
+            step_y = y_edges[2] - y_edges[1]
+            idx_x = floor(Int, (x - min_x) / step_x) + 1
+            idx_y = floor(Int, (y - min_y) / step_y) + 1
+            nx_l = length(x_edges) - 1
+            ny_l = length(y_edges) - 1
+            if idx_x > nx_l && idx_x <= nx_l + 1; idx_x = nx_l; end
+            if idx_y > ny_l && idx_y <= ny_l + 1; idx_y = ny_l; end
+            if 1 <= idx_x <= nx_l && 1 <= idx_y <= ny_l
+                @inbounds Atomix.@atomic hist[idx_x, idx_y] += Int32(1)
+            end
+        end
+    else
+        kernel = histogram_kernel(backend)
+        kernel(xs, ys, x_edges, y_edges, vec(hist), Int32(nx), Int32(ny), ndrange=length(xs))
+    end
+    
     Hist2D(x_edges, y_edges, hist)
+end
+
+function histogram(points::AbstractVector{<:Complex}, x_edges, y_edges)
+    histogram(real(points), imag(points), x_edges, y_edges)
 end

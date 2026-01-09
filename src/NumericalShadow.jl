@@ -1,6 +1,6 @@
 module NumericalShadow
 using LinearAlgebra
-using CUDA
+using KernelAbstractions
 using NPZ
 
 const nTPB = 256
@@ -28,5 +28,9 @@ include("random_matrices.jl")
 include("range.jl")
 include("shadow.jl")
 include("histogram.jl")
+
+function move_to_backend(backend, data)
+    data
+end
 
 end
