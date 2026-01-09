@@ -27,3 +27,5 @@ docs/site/
 Manifest.toml
 
 examples/results
+benchmarks/*.txt
+benchmarks/Manifest.toml
