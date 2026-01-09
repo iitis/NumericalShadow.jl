@@ -1,4 +1,3 @@
-export shadow_GPU
 using ProgressMeter
 using KernelAbstractions
 
