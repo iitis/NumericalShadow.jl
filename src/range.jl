@@ -2,9 +2,9 @@ using LinearAlgebra
 import LazySets: convex_hull
 import Combinatorics: combinations
 
-function numerical_range(A::Matrix, resolution::Number = 0.01)
+function numerical_range(A::AbstractMatrix, resolution::Number = 0.01)
     w = ComplexF64[]
-    for θ = 0:resolution:2pi
+    for θ in 0:resolution:2pi
         Ath = exp(1im * -θ) * A
         Hth = (Ath + Ath') / 2
         F = eigen(Hth)
@@ -41,33 +41,33 @@ function numerical_range(A::Matrix, resolution::Number = 0.01)
     return reduce(hcat, nr)'
 end
 
-side(point, v1, v2) = (point[1] - v2[1]) * (v1[2] - v2[2]) - (v1[1] - v2[1]) * (point[2] - v2[2])
+side(point, v1, v2) =
+    (point[1] - v2[1]) * (v1[2] - v2[2]) - (v1[1] - v2[1]) * (point[2] - v2[2])
 
 function in_triangle(point, triangle)
     side_tests = [side(point, vertices...) for vertices in combinations(triangle, 2)]
-    # all(x->x>0, side_tests)
-    all(x->x<0, side_tests)
+    all(x -> x < 0, side_tests)
 end
 
-function circle(r::Real, n::Int, c::Vector{<:Real} = [0., 0.])
+function circle(r::Real, n::Int, c::AbstractVector{<:Real} = [0.0, 0.0])
     t = LinRange(0, 2π, n)
     x = c[1] .+ r * cos.(t)
     y = c[2] .+ r * sin.(t)
     collect.(eachrow(hcat(x, y)))
 end
 
-circle(r::Real, n::Int, c::ComplexF64) = circle([real(c), imag(c)], r, n)
+circle(r::Real, n::Int, c::Complex) = circle(r, n, [real(c), imag(c)])
 
 function ellipse(f1, f2, e, n)
     t = LinRange(0, 2π, n)
-    z = (f1-f2)/2;
-    c = abs(z);
-    r = angle(z);
-    a = c/e;
-    b = sqrt(a^2 - c^2);
-    z1 = (f1+f2)/2;
-    p = real(z1);
-    q = imag(z1);
+    z = (f1 - f2) / 2
+    c = abs(z)
+    r = angle(z)
+    a = c / e
+    b = sqrt(a^2 - c^2)
+    z1 = (f1 + f2) / 2
+    p = real(z1)
+    q = imag(z1)
 
     x = a * cos.(r) * cos.(t) .- b * sin(r) * sin.(t) .+ p
     y = a * sin.(r) * cos.(t) .+ b * cos(r) * sin.(t) .+ q
@@ -92,15 +92,18 @@ function subrange(q::Real, n::Int, evs::Vector)
     return points
 end
 
-function qrange(A, q::Real=1, n::Int=1000)
+function qrange(A::AbstractMatrix, q::Real = 1, n::Int = 1000)
+    n > 0 || throw(ArgumentError("`n` must be a positive integer, got $n"))
+    0 <= q <= 1 || throw(ArgumentError("`q` must satisfy 0 <= q <= 1, got $q"))
+
     q == 1 && return numerical_range(A)
     @assert A' * A ≈ I "Only unitary matrices supported"
     evs = unique(eigvals(A))
     length(evs) == 1 && return q * [real(evs[1]) imag(evs[1])]
-    length(evs) == 2 && return reduce(hcat, convex_hull(ellipse(q*evs[1], q*evs[2], q, n)))'
+    length(evs) == 2 && return reduce(hcat, convex_hull(ellipse(q * evs[1], q * evs[2], q, n)))'
     points = Vector{Float64}[]
     for comb in combinations(evs, 3)
-        sort!(comb, by=angle)
+        sort!(comb, by = angle)
         append!(points, subrange(q, n, comb))
     end
     return reduce(hcat, convex_hull(points))'

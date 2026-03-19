@@ -1,13 +1,19 @@
 using ProgressMeter
 using KernelAbstractions
 
+function _validate_square_matrix(A::AbstractMatrix, name::AbstractString = "A")
+    size(A, 1) == size(A, 2) ||
+        throw(ArgumentError("`$name` must be square, got size $(size(A))"))
+    return A
+end
+
 @kernel function batched_kron_kernel(z, @Const(x), @Const(y))
     i = @index(Global, Linear)
     if i <= size(z, 2)
         d1 = size(x, 1)
         d2 = size(y, 1)
-        for k=1:d1, l=1:d2
-            z[(k-1)*d2+l, i] = x[k, i] * y[l, i]
+        for k in 1:d1, l in 1:d2
+            z[(k - 1) * d2 + l, i] = x[k, i] * y[l, i]
         end
     end
 end
@@ -15,10 +21,22 @@ end
 function batched_kron!(z, x, y)
     backend = KernelAbstractions.get_backend(z)
     kernel = batched_kron_kernel(backend)
-    kernel(z, x, y, ndrange=size(z, 2))
+    kernel(z, x, y, ndrange = size(z, 2))
 end
 
-function shadow(backend, A::Matrix, samples::Int, sampling_f, batchsize::Int = 1_000_000)
+"""
+    shadow(backend, A, samples, sampling_f; batchsize=1_000_000)
+
+Estimate the numerical shadow of matrix `A` on `backend`.
+
+`sampling_f` is called as `sampling_f(backend, d, n)` and must return `n`
+state vectors of dimension `d`.
+"""
+function shadow(backend, A::AbstractMatrix, samples, sampling_f, batchsize = 1_000_000)
+    _validate_square_matrix(A)
+    samples = _validate_positive_int(:samples, samples)
+    batchsize = _validate_positive_int(:batchsize, batchsize)
+
     d = size(A, 1)
     Ad = move_to_backend(backend, A)
     dims_edges = get_bin_edges(A, 1000)
@@ -40,8 +58,21 @@ function shadow(backend, A::Matrix, samples::Int, sampling_f, batchsize::Int = 1
     return shadow_hist
 end
 
-function product_qshadow(backend, ::Type{T}, A::Matrix, samples::Int, q::Real, batchsize::Int = 1_000_000) where {T}
+"""
+    product_qshadow(backend, T, A, samples, q; batchsize=1_000_000)
+
+Estimate the product-state q-shadow for matrix `A` on `backend`.
+"""
+function product_qshadow(backend, ::Type{T}, A::AbstractMatrix, samples, q::Real, batchsize = 1_000_000) where {T}
+    _validate_square_matrix(A)
+    samples = _validate_positive_int(:samples, samples)
+    batchsize = _validate_positive_int(:batchsize, batchsize)
+    q = _validate_q(q)
+
     d = isqrt(size(A, 1))
+    d * d == size(A, 1) ||
+        throw(ArgumentError("`size(A, 1)` must be a perfect square, got $(size(A, 1))"))
+
     Ad = move_to_backend(backend, A)
     dims_edges = get_bin_edges(A, 1000, q)
     x_edges = move_to_backend(backend, collect(dims_edges[1]))
@@ -68,7 +99,17 @@ function product_qshadow(backend, ::Type{T}, A::Matrix, samples::Int, q::Real, b
     return shadow_hist
 end
 
-function qshadow(backend, ::Type{T}, A::Matrix, samples::Int, q::Real, batchsize::Int = 1_000_000) where {T}
+"""
+    qshadow(backend, T, A, samples, q; batchsize=1_000_000)
+
+Estimate the q-shadow of matrix `A` on `backend`.
+"""
+function qshadow(backend, ::Type{T}, A::AbstractMatrix, samples, q::Real, batchsize = 1_000_000) where {T}
+    _validate_square_matrix(A)
+    samples = _validate_positive_int(:samples, samples)
+    batchsize = _validate_positive_int(:batchsize, batchsize)
+    q = _validate_q(q)
+
     d = size(A, 1)
     Ad = move_to_backend(backend, A)
     dims_edges = get_bin_edges(A, 1000, q)

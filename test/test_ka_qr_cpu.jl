@@ -1,109 +1,95 @@
 using KernelAbstractions
 using LinearAlgebra
+using NumericalShadow
+using Random
 using Test
 
-# Copy the kernels from the CUDA extension, but run on CPU
-@kernel inbounds = true function reconstruct_Q_unitary!(Q, A, tau_mat, phases, d, batchsize)
-    batch_idx = @index(Global, Linear)
-
-    if batch_idx <= batchsize
-        @inbounds for row in 1:d
-            @inbounds for col in 1:d
-                Q[row, col, batch_idx] = row == col ? one(eltype(Q)) : zero(eltype(Q))
-            end
-        end
-
-        @inbounds for k in d:-1:1
-            τk = tau_mat[k, batch_idx]
-
-            for col in 1:d
-                dot = zero(eltype(Q))
-                for r in k:d
-                    v_r = r == k ? one(eltype(Q)) : A[r, k, batch_idx]
-                    dot += conj(v_r) * Q[r, col, batch_idx]
-                end
-                for r in k:d
-                    v_r = r == k ? one(eltype(Q)) : A[r, k, batch_idx]
-                    Q[r, col, batch_idx] -= τk * v_r * dot
-                end
-            end
-
-            phases[k, batch_idx] = A[k, k, batch_idx] / sqrt(abs2(A[k, k, batch_idx]))
-        end
-    end
+const HAS_CUDA_KA_QR_TEST = try
+    @eval using CUDA
+    CUDA.functional()
+catch
+    false
 end
 
-@kernel function apply_phases!(Q, phases, d, batchsize)
-    batch_idx = @index(Global, Linear)
+const RUN_SLOW_TESTS = lowercase(get(ENV, "NUMERICALSHADOW_RUN_SLOW_TESTS", "false")) in
+                       ("1", "true", "yes")
 
-    if batch_idx <= batchsize
-        @inbounds for row in 1:d
-            @inbounds for col in 1:d
-                Q[row, col, batch_idx] *= phases[row, batch_idx]
-            end
-        end
-    end
-end
-
-"""
-    ka_random_unitary(T, d, batchsize)
-
-Generate random unitary matrices using LAPACK geqrf! + KernelAbstractions kernels on CPU.
-This mirrors the CUDA extension path but runs entirely on CPU.
-"""
-function ka_random_unitary(::Type{T}, d::Int, batchsize::Int) where {T}
-    backend = CPU()
-
-    Z = randn(T, d, d, batchsize)
-
-    # Use LAPACK geqrf! on each slice to get compact Householder form + tau
-    tau_mat = zeros(T, d, batchsize)
-    for i in 1:batchsize
-        slice = view(Z, :, :, i)
-        tau_vec = zeros(T, d)
-        LAPACK.geqrf!(slice, tau_vec)
-        tau_mat[:, i] .= tau_vec
-    end
-
-    Q = zeros(T, d, d, batchsize)
-    phases = zeros(T, d, batchsize)
-
-    kernel = reconstruct_Q_unitary!(backend)
-    kernel(Q, Z, tau_mat, phases, d, batchsize, ndrange=batchsize)
-    KernelAbstractions.synchronize(backend)
-
-    apply_phases!(backend)(Q, phases, d, batchsize, ndrange=batchsize)
-    KernelAbstractions.synchronize(backend)
-
-    return Q
-end
-
-"""
-    native_random_unitary(T, d, batchsize)
-
-Generate random unitary matrices using Julia's native qr() with phase correction.
-This is the existing CPU path from NumericalShadow.jl.
-"""
 function native_random_unitary(::Type{T}, d::Int, batchsize::Int) where {T}
     Q = zeros(T, d, d, batchsize)
     for i in 1:batchsize
         g = randn(T, d, d)
         q_val, r_val = qr(g)
         d_diag = sign.(diag(r_val))
-        d_diag[d_diag.==0] .= 1
-        d_mat = Diagonal(d_diag)
-        Q[:, :, i] .= Matrix(q_val) * d_mat
+        d_diag[d_diag .== 0] .= 1
+        Q[:, :, i] .= Matrix(q_val) * Diagonal(d_diag)
     end
     return Q
 end
 
+function ka_reconstruct_from_geqrf(g::AbstractMatrix{T}; apply_phases::Bool) where {T}
+    d = size(g, 1)
+    Z = copy(g)
+    tau_vec = zeros(T, d)
+    LAPACK.geqrf!(Z, tau_vec)
+
+    Q = zeros(T, d, d, 1)
+    tau_mat = reshape(tau_vec, d, 1)
+    phases = zeros(T, d, 1)
+    Z3d = reshape(Z, d, d, 1)
+
+    NumericalShadow._reconstruct_q_from_compact_qr!(
+        CPU(),
+        Q,
+        Z3d,
+        tau_mat,
+        phases,
+        d,
+        1;
+        apply_phases = apply_phases,
+    )
+    return Q[:, :, 1], phases[:, 1]
+end
+
+function collect_eigenphases(Q_batch)
+    d1, d2, batchsize = size(Q_batch)
+    @assert d1 == d2
+    phases = Vector{Float64}(undef, d1 * batchsize)
+    for i in 1:batchsize
+        sample_range = ((i - 1) * d1 + 1):(i * d1)
+        phases[sample_range] .= angle.(eigvals(Q_batch[:, :, i]))
+    end
+    return phases
+end
+
+function phase_density(phases::AbstractVector{<:Real})
+    bin_edges = collect(-π:0.1π:π)
+    n_bins = length(bin_edges) - 1
+    bin_width = bin_edges[2] - bin_edges[1]
+    counts = zeros(Int, n_bins)
+
+    for θ in phases
+        idx = searchsortedlast(bin_edges, θ)
+        if idx == length(bin_edges)
+            # Keep θ == π in the last bin.
+            idx -= 1
+        end
+        if 1 <= idx <= n_bins
+            counts[idx] += 1
+        end
+    end
+
+    return counts ./ (length(phases) * bin_width)
+end
+
 @testset "KA QR vs Native QR on CPU" begin
+    Random.seed!(1234)
+
     T = ComplexF64
     d = 6
     batchsize = 100
 
     @testset "KA produces unitary matrices" begin
-        Q_ka = ka_random_unitary(T, d, batchsize)
+        Q_ka = random_unitary(CPU(), T, d, batchsize)
         for i in 1:batchsize
             Qi = Q_ka[:, :, i]
             @test Qi' * Qi ≈ I atol = 1e-10
@@ -123,35 +109,14 @@ end
     end
 
     @testset "Householder reconstruction matches native Q (before phases)" begin
-        # The raw Q from Householder reconstruction should exactly match
-        # Julia's qr() Q factor. The phase correction differs:
-        #   Native: Q * Diagonal(sign(diag(R)))  (column scaling)
-        #   KA:     Diagonal(sign(diag(R))) * Q  (row scaling)
-        # Both produce valid Haar-random unitaries since left/right multiplication
-        # by a diagonal unitary preserves the Haar measure.
+        # The raw Q from Householder reconstruction should match Julia's qr() Q factor.
         for _ in 1:20
             g = randn(T, d, d)
-
-            # Native Q (no phase correction)
             q_val, _ = qr(g)
             Q_native = Matrix(q_val)
 
-            # KA path: reconstruct Q from geqrf! output (no phase step)
-            Z = copy(g)
-            tau_vec = zeros(T, d)
-            LAPACK.geqrf!(Z, tau_vec)
-
-            Q_ka = zeros(T, d, d, 1)
-            tau_mat = reshape(tau_vec, d, 1)
-            phases = zeros(T, d, 1)
-            Z3d = reshape(Z, d, d, 1)
-
-            backend = CPU()
-            reconstruct_Q_unitary!(backend)(Q_ka, Z3d, tau_mat, phases, d, 1, ndrange=1)
-            KernelAbstractions.synchronize(backend)
-            # Do NOT apply phases — compare raw Q
-
-            @test Q_ka[:, :, 1] ≈ Q_native atol = 1e-10
+            Q_ka_raw, _ = ka_reconstruct_from_geqrf(g; apply_phases = false)
+            @test Q_ka_raw ≈ Q_native atol = 1e-10
         end
     end
 
@@ -159,60 +124,62 @@ end
         for _ in 1:10
             g = randn(T, d, d)
 
-            # Native: Q * Diagonal(sign(diag(R)))
             q_val, r_val = qr(g)
             d_diag = sign.(diag(r_val))
-            d_diag[d_diag.==0] .= 1
+            d_diag[d_diag .== 0] .= 1
             Q_native_phased = Matrix(q_val) * Diagonal(d_diag)
 
-            # KA: Diagonal(sign(diag(R))) * Q  (row scaling via apply_phases! kernel)
-            Z = copy(g)
-            tau_vec = zeros(T, d)
-            LAPACK.geqrf!(Z, tau_vec)
+            Q_ka, phase_vec = ka_reconstruct_from_geqrf(g; apply_phases = true)
 
-            Q_ka = zeros(T, d, d, 1)
-            tau_mat = reshape(tau_vec, d, 1)
-            phases = zeros(T, d, 1)
-            Z3d = reshape(Z, d, d, 1)
-
-            backend = CPU()
-            reconstruct_Q_unitary!(backend)(Q_ka, Z3d, tau_mat, phases, d, 1, ndrange=1)
-            KernelAbstractions.synchronize(backend)
-            apply_phases!(backend)(Q_ka, phases, d, 1, ndrange=1)
-            KernelAbstractions.synchronize(backend)
-
-            # Verify: Q_ka = Diagonal(phases) * Q_native_raw
-            # and Q_native_phased = Q_native_raw * Diagonal(phases)
-            # so Q_ka = Diagonal(phases) * Q_native_phased * Diagonal(conj.(phases))
-            phase_vec = phases[:, 1]
+            # Q_ka = Diagonal(phase) * Q_native_raw
+            # Q_native_phased = Q_native_raw * Diagonal(phase)
+            # so Q_ka = Diagonal(phase) * Q_native_phased * Diagonal(conj.(phase))
             expected = Diagonal(phase_vec) * Q_native_phased * Diagonal(conj.(phase_vec))
-            @test Q_ka[:, :, 1] ≈ expected atol = 1e-10
-
-            # Both are still unitary
-            @test Q_ka[:, :, 1]' * Q_ka[:, :, 1] ≈ I atol = 1e-10
+            @test Q_ka ≈ expected atol = 1e-10
+            @test Q_ka' * Q_ka ≈ I atol = 1e-10
             @test Q_native_phased' * Q_native_phased ≈ I atol = 1e-10
         end
     end
 
     @testset "Singular values are all 1" begin
-        Q_ka = ka_random_unitary(T, d, batchsize)
+        Q_ka = random_unitary(CPU(), T, d, batchsize)
         for i in 1:min(20, batchsize)
             sv = svdvals(Q_ka[:, :, i])
-            @test all(isapprox.(sv, 1.0, atol=1e-10))
+            @test all(isapprox.(sv, 1.0, atol = 1e-10))
         end
     end
 
     @testset "Eigenvalues on unit circle" begin
-        Q_ka = ka_random_unitary(T, d, batchsize)
+        Q_ka = random_unitary(CPU(), T, d, batchsize)
         for i in 1:min(20, batchsize)
             evs = eigvals(Q_ka[:, :, i])
-            @test all(isapprox.(abs.(evs), 1.0, atol=1e-10))
+            @test all(isapprox.(abs.(evs), 1.0, atol = 1e-10))
+        end
+    end
+
+    @testset "Eigenvalue phase distribution is approximately uniform" begin
+        if !RUN_SLOW_TESTS
+            @test_skip "Set NUMERICALSHADOW_RUN_SLOW_TESTS=true to enable statistical phase tests."
+        else
+            # CUE-like marginal check: eigenphases should be approximately uniform on [-π, π).
+            dim = 100
+            steps = 100
+            expected_density = 1 / (2π)
+
+            for Q_batch in (
+                random_unitary(CPU(), T, dim, steps),
+                native_random_unitary(T, dim, steps),
+            )
+                phases = collect_eigenphases(Q_batch)
+                empirical_density = phase_density(phases)
+                @test all(isapprox.(empirical_density, expected_density, atol = 0.03))
+            end
         end
     end
 
     @testset "Different matrix sizes" begin
         for dim in [2, 3, 5, 8, 12]
-            Q_ka = ka_random_unitary(T, dim, 10)
+            Q_ka = random_unitary(CPU(), T, dim, 10)
             for i in 1:10
                 Qi = Q_ka[:, :, i]
                 @test Qi' * Qi ≈ I atol = 1e-10
@@ -221,11 +188,50 @@ end
     end
 
     @testset "ComplexF32 support" begin
-        Q_ka = ka_random_unitary(ComplexF32, d, 20)
+        Q_ka = random_unitary(CPU(), ComplexF32, d, 20)
         for i in 1:20
             Qi = Q_ka[:, :, i]
             @test Qi' * Qi ≈ I atol = 1e-4
             @test abs(det(Qi)) ≈ 1.0 atol = 1e-4
+        end
+    end
+end
+
+@testset "KA QR CUDA path (if available)" begin
+    if !HAS_CUDA_KA_QR_TEST
+        @test_skip "CUDA not functional in this environment"
+    else
+        Random.seed!(1234)
+
+        backend = CUDABackend()
+        T = ComplexF64
+        d = 6
+        batchsize = 40
+
+        Q_gpu = random_unitary(backend, T, d, batchsize)
+        Q = Array(Q_gpu)
+
+        @test size(Q) == (d, d, batchsize)
+        for i in 1:batchsize
+            Qi = Q[:, :, i]
+            @test Qi' * Qi ≈ I atol = 1e-8
+            @test Qi * Qi' ≈ I atol = 1e-8
+            @test abs(det(Qi)) ≈ 1.0 atol = 1e-8
+        end
+
+        @testset "Eigenvalue phase distribution is approximately uniform" begin
+            if !RUN_SLOW_TESTS
+                @test_skip "Set NUMERICALSHADOW_RUN_SLOW_TESTS=true to enable statistical phase tests."
+            else
+                dim = 64
+                steps = 40
+                expected_density = 1 / (2π)
+
+                Q_batch = Array(random_unitary(backend, T, dim, steps))
+                phases = collect_eigenphases(Q_batch)
+                empirical_density = phase_density(phases)
+                @test all(isapprox.(empirical_density, expected_density, atol = 0.06))
+            end
         end
     end
 end

@@ -4,9 +4,13 @@ using CUDA
 using KernelAbstractions
 using NumericalShadow
 using LinearAlgebra
-using TensorCast
 
-import NumericalShadow: _random_pure, _random_unitary, move_to_backend, gram_schmidt_step
+import NumericalShadow:
+    _random_pure,
+    _random_unitary,
+    _reconstruct_q_from_compact_qr!,
+    gram_schmidt_step,
+    move_to_backend
 
 function move_to_backend(::CUDABackend, data)
     CuArray(data)
@@ -30,49 +34,6 @@ function _random_pure(::CUDABackend, ::Type{T}, d, batchsize) where {T}
     return ψd
 end
 
-@kernel inbounds=true function reconstruct_Q_unitary!(Q, A, tau_mat, phases, d, batchsize)
-    batch_idx = @index(Global, Linear)
-
-    if batch_idx <= batchsize 
-        @inbounds for row in 1:d
-            @inbounds for col in 1:d
-                Q[row, col, batch_idx] = row == col ? one(eltype(Q)) : zero(eltype(Q))
-            end
-        end
-
-        @inbounds for k in d:-1:1
-             τk = tau_mat[k, batch_idx]
-
-            for col in 1:d
-                dot = zero(eltype(Q))
-                for r in k:d
-                    v_r = r == k ? one(eltype(Q)) : A[r, k, batch_idx]
-                    dot += conj(v_r) * Q[r, col, batch_idx]
-                end
-                for r in k:d
-                    v_r = r == k ? one(eltype(Q)) : A[r, k, batch_idx]
-                    Q[r, col, batch_idx] -= τk * v_r * dot
-                end
-            end
-
-            phases[k, batch_idx] = A[k, k, batch_idx] / sqrt(abs2(A[k, k, batch_idx]))
-
-        end
-    end
-end
-
-@kernel function apply_phases!(Q, phases, d, batchsize)
-    batch_idx = @index(Global, Linear)
-
-    if batch_idx <= batchsize
-        @inbounds for row in 1:d
-            @inbounds for col in 1:d
-                Q[row, col, batch_idx] *= phases[row, batch_idx]
-            end
-        end
-    end
-end
-
 function _random_unitary(backend::CUDABackend, ::Type{T}, d, batchsize) where {T}
     Z = CUDA.randn(T, d, d, batchsize)
     # Z is modified in-place by geqrf_batched! to store vectors v, 
@@ -93,13 +54,7 @@ function _random_unitary(backend::CUDABackend, ::Type{T}, d, batchsize) where {T
         tau_mat[:, i] .= tau[i]
     end
 
-    kernel = reconstruct_Q_unitary!(backend)
-    kernel(Q, Z, tau_mat, phases, d, batchsize, ndrange=batchsize)
-        
-    KernelAbstractions.synchronize(backend)
-    apply_phases!(backend)(Q, phases, d, batchsize, ndrange=batchsize)
-    KernelAbstractions.synchronize(backend)
-
+    _reconstruct_q_from_compact_qr!(backend, Q, Z, tau_mat, phases, d, batchsize)
     return Q
 end
 

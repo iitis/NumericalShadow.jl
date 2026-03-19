@@ -1,23 +1,15 @@
 using KernelAbstractions
 using Atomix
 
-# Shim for atomic operations outside of kernels if needed, 
-# but inside kernels we should use KernelAbstractions.@atomic
-function get_bounding_box_old(A::Matrix)
-    reA = Hermitian(A + A' / 2)
-    imA = Hermitian(-1im * (A - A') / 2.0)
-    reEig = eigvals(reA)
-    imEig = eigvals(imA)
-    mx, Mx, my, My = reEig[1], reEig[end], imEig[1], imEig[end]
-    return mx, Mx, my, My
-end
-
-function get_bounding_box(A::Matrix, q::Real=1)
-    nr = qrange(A, q) 
+function get_bounding_box(A::AbstractMatrix, q::Real = 1)
+    nr = qrange(A, q)
     minimum(nr[:, 1]), maximum(nr[:, 1]), minimum(nr[:, 2]), maximum(nr[:, 2])
 end
 
-function get_bin_edges(A::Matrix, nbins_x::Int, q::Real=1, nbins_y::Int = nbins_x)
+function get_bin_edges(A::AbstractMatrix, nbins_x::Int, q::Real = 1, nbins_y::Int = nbins_x)
+    nbins_x > 0 || throw(ArgumentError("`nbins_x` must be positive, got $nbins_x"))
+    nbins_y > 0 || throw(ArgumentError("`nbins_y` must be positive, got $nbins_y"))
+
     min_x, max_x, min_y, max_y = get_bounding_box(A, q)
     if min_x ≈ max_x
         min_x -= 0.5
@@ -31,6 +23,16 @@ function get_bin_edges(A::Matrix, nbins_x::Int, q::Real=1, nbins_y::Int = nbins_
     y_edges = min_y:(max_y-min_y)/nbins_y:max_y
     x_edges, y_edges
 end
+
+"""
+    Hist2D(x_edges, y_edges)
+
+2D histogram container used by shadow routines.
+
+`x_edges` and `y_edges` define bin edges, while `hist` stores counts.
+Additional optional fields (`nr`, `evs`, `other_range`) are metadata helpers
+used by plotting/analysis workflows.
+"""
 mutable struct Hist2D
     x_edges::AbstractVector
     y_edges::AbstractVector
@@ -51,6 +53,11 @@ function Base.:+(h1::Hist2D, h2::Hist2D)
     Hist2D(h1.x_edges, h1.y_edges, h1.hist + h2.hist)
 end
 
+"""
+    save(h::Hist2D, fname)
+
+Serialize histogram `h` to an `.npz` file.
+"""
 function save(h::Hist2D, fname::String)
     all_points = collect(Iterators.product(Array(h.x_edges), Array(h.y_edges)))
     origin_dist, idx = findmin(x->sqrt(x[1]^2 + x[2]^2), all_points)
