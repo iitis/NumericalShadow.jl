@@ -1,7 +1,11 @@
 using NumericalShadow
+using KernelAbstractions
 using LinearAlgebra
 using CUDA
 using ProgressMeter
+
+CUDA.functional() || error("CUDA is not functional. This example requires a working CUDA setup.")
+backend = CUDABackend()
 
 samples = 10^8
 batchsize = 10^8
@@ -10,7 +14,7 @@ d = 2
 U = Array(qr(rand(ComplexF32, d^2, d^2)).Q)
 U = Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/3)]))
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
-   shadow = NumericalShadow.qshadow_GPU(T, U, samples, q, batchsize)
+   shadow = NumericalShadow.qshadow(backend, T, U, samples, q, batchsize)
    shadow.nr = NumericalShadow.numerical_range(U)
    shadow.evs = eigvals(U)
    shadow.other_range = NumericalShadow.qrange(U, q)
@@ -21,7 +25,7 @@ U = Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/3)]))
 end
 
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
-    shadow = NumericalShadow.product_qshadow_GPU(T, U, samples, q, batchsize)
+    shadow = NumericalShadow.product_qshadow(backend, T, U, samples, q, batchsize)
     shadow.nr = NumericalShadow.numerical_range(U)
     shadow.evs = eigvals(U)
     shadow.other_range = NumericalShadow.qrange(U, q)
@@ -38,7 +42,7 @@ d = 2
 U = Array(qr(rand(ComplexF32, d^2, d^2)).Q)
 U = Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/3)]))
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
-   shadow = NumericalShadow.qshadow_GPU(T, U, samples, q, batchsize)
+   shadow = NumericalShadow.qshadow(backend, T, U, samples, q, batchsize)
    shadow.nr = NumericalShadow.numerical_range(U)
    shadow.evs = eigvals(U)
    shadow.other_range = NumericalShadow.qrange(U, q)
@@ -49,7 +53,7 @@ U = Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/3)]))
 end
 
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
-    shadow = NumericalShadow.product_qshadow_GPU(T, U, samples, q, batchsize)
+    shadow = NumericalShadow.product_qshadow(backend, T, U, samples, q, batchsize)
     shadow.nr = NumericalShadow.numerical_range(U)
     shadow.evs = eigvals(U)
     shadow.other_range = NumericalShadow.qrange(U, q)

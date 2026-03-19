@@ -1,9 +1,13 @@
 using NumericalShadow
+using KernelAbstractions
 using LinearAlgebra
 using CUDA
 using ProgressMeter
 using QuantumInformation
 using Random
+
+CUDA.functional() || error("CUDA is not functional. This example requires a working CUDA setup.")
+backend = CUDABackend()
 
 Random.seed!(42)
 samples = 10^10
@@ -19,7 +23,7 @@ W = I(d) - 2 / local_d * proj(vec(I(local_d)))
 
 @showprogress 2 "Iteratring α" offset=1 for α=0.0:0.01:1
     A = (UV)^(1-α) * W^α
-    shadow = shadow_GPU(T, A, samples, random_product, batchsize)
+    shadow = NumericalShadow.product_qshadow(backend, T, A, samples, 1.0, batchsize)
     shadow.nr = NumericalShadow.numerical_range(A)
     shadow.evs = eigvals(A)
     NumericalShadow.save(

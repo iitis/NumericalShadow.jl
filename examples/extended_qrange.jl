@@ -1,7 +1,11 @@
 using NumericalShadow
+using KernelAbstractions
 using LinearAlgebra
 using CUDA
 using ProgressMeter
+
+CUDA.functional() || error("CUDA is not functional. This example requires a working CUDA setup.")
+backend = CUDABackend()
 
 function swap(n, perm)
     @assert length(perm) == n
@@ -24,7 +28,7 @@ U = Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/3)]))
 U = kron(kron(I(2), U), I(2))
 
 # @showprogress 2 "Iteratring q" for q=0.01:0.01:1
-#    shadow = NumericalShadow.qshadow_GPU(T, U, samples, q, batchsize)
+#    shadow = NumericalShadow.qshadow(backend, T, U, samples, q, batchsize)
 #    shadow.nr = NumericalShadow.numerical_range(U)
 #    shadow.evs = eigvals(U)
 #    shadow.other_range = NumericalShadow.qrange(U, q)
@@ -35,7 +39,7 @@ U = kron(kron(I(2), U), I(2))
 # end
 
 # @showprogress 2 "Iteratring q" for q=0.01:0.01:1
-#     shadow = NumericalShadow.product_qshadow_GPU(T, U, samples, q, batchsize)
+#     shadow = NumericalShadow.product_qshadow(backend, T, U, samples, q, batchsize)
 #     shadow.nr = NumericalShadow.numerical_range(U)
 #     shadow.evs = eigvals(U)
 #     shadow.other_range = NumericalShadow.qrange(U, q)
@@ -47,7 +51,7 @@ U = kron(kron(I(2), U), I(2))
 
 T = Float32
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
-   shadow = NumericalShadow.qshadow_GPU(T, U, samples, q, batchsize)
+   shadow = NumericalShadow.qshadow(backend, T, U, samples, q, batchsize)
    shadow.nr = NumericalShadow.numerical_range(U)
    shadow.evs = eigvals(U)
    shadow.other_range = NumericalShadow.qrange(U, q)
@@ -58,7 +62,7 @@ T = Float32
 end
 
 @showprogress 2 "Iteratring q" for q=0.01:0.01:1
-    shadow = NumericalShadow.product_qshadow_GPU(T, U, samples, q, batchsize)
+    shadow = NumericalShadow.product_qshadow(backend, T, U, samples, q, batchsize)
     shadow.nr = NumericalShadow.numerical_range(U)
     shadow.evs = eigvals(U)
     shadow.other_range = NumericalShadow.qrange(U, q)

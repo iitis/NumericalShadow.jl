@@ -1,13 +1,18 @@
 using NumericalShadow
+using KernelAbstractions
 using LinearAlgebra
+using CUDA
+
+CUDA.functional() || error("CUDA is not functional. This example requires a working CUDA setup.")
+backend = CUDABackend()
 
 samples = 10^10
 batchsize = 10^8
 T = ComplexF32
 
 A = collect(Diagonal([1, exp(2im * pi / 3), exp(4im * pi / 3)]))
-sampling_f = (x...) -> NumericalShadow.random_pure(T, x...)
-shadow = NumericalShadow.shadow_GPU(A, samples, sampling_f, batchsize)
+sampling_f = (b, d, n) -> NumericalShadow.random_pure(b, T, d, n)
+shadow = NumericalShadow.shadow(backend, A, samples, sampling_f, batchsize)
 shadow.nr = NumericalShadow.numerical_range(A)
 shadow.evs = eigvals(A)
 NumericalShadow.save(
@@ -17,8 +22,8 @@ NumericalShadow.save(
 
 T = Float32
 A = collect(Diagonal([1, exp(2im * pi / 3), exp(4im * pi / 3)]))
-sampling_f = (x...) -> NumericalShadow.random_pure(T, x...)
-shadow = NumericalShadow.shadow_GPU(A, samples, sampling_f, batchsize)
+sampling_f = (b, d, n) -> NumericalShadow.random_pure(b, T, d, n)
+shadow = NumericalShadow.shadow(backend, A, samples, sampling_f, batchsize)
 shadow.nr = NumericalShadow.numerical_range(A)
 shadow.evs = eigvals(A)
 NumericalShadow.save(
