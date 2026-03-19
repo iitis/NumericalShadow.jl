@@ -10,7 +10,6 @@ LazySets = "b4f0291d-fe17-52bc-9479-3d1a343d9043"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
-TensorCast = "02d47bb6-7ce6-556a-be16-bb1710789e2b"
 
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
@@ -21,6 +20,7 @@ NumericalShadowCUDAExt = "CUDA"
 [compat]
 Aqua = "0.8"
 Atomix = "1"
+BenchmarkTools = "1"
 CUDA = "5"
 Combinatorics = "1"
 KernelAbstractions = "0.9"
@@ -28,8 +28,8 @@ LazySets = "2"
 LinearAlgebra = "1"
 NPZ = "0.4"
 ProgressMeter = "1"
+Random = "1"
 StatsBase = "0.34.9"
-TensorCast = "0.4"
 Test = "1"
 julia = "1.11, 1.12"
 
@@ -37,8 +37,9 @@ julia = "1.11, 1.12"
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Aqua", "CUDA", "StatsBase", "Test"]
+test = ["Aqua", "CUDA", "Random", "StatsBase", "Test"]

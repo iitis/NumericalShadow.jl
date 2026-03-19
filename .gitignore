@@ -28,4 +28,6 @@ Manifest.toml
 
 examples/results
 benchmarks/*.txt
+benchmarks/*.png
+benchmarks/benchmark_results.txt
 benchmarks/Manifest.toml
