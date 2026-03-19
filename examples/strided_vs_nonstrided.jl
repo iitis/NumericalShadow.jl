@@ -1,3 +1,7 @@
+# Shadow.pdf mapping:
+#   Not related to Problems 1-4.
+# CUDA strided vs non-strided batched GEMM micro-benchmark script.
+
 using CUDA
 
 # compare gelsBatched, geqrfBatched and CPU generation

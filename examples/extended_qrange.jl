@@ -1,3 +1,7 @@
+# Shadow.pdf mapping:
+#   Not a direct Problem 1/2/3/4 script.
+# This is an extended legacy q-shadow/product-q-shadow experiment.
+
 using NumericalShadow
 using KernelAbstractions
 using LinearAlgebra

@@ -1,3 +1,7 @@
+# Shadow.pdf mapping:
+#   Problem 1 baseline (d = 0 normal matrix case).
+# Use this to compare with the non-normal sweep in `hidden_non_normal.jl`.
+
 using NumericalShadow
 using KernelAbstractions
 using LinearAlgebra

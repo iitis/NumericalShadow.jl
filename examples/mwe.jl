@@ -1,3 +1,7 @@
+# Shadow.pdf mapping:
+#   Not related to Problems 1-4.
+# Minimal threading/QR benchmark reproducer.
+
 using Base.Threads
 using LinearAlgebra
 using BenchmarkTools

@@ -1,3 +1,8 @@
+# Shadow.pdf mapping:
+#   Problem 1 (convexoid vs normal case for A(d), d in [0, 1/2]).
+# This script sweeps d and computes numerical shadow samples for the
+# non-normal extension of diag(1, ω, ω^2).
+
 using NumericalShadow
 using KernelAbstractions
 using LinearAlgebra

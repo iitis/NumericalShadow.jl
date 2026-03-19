@@ -1,3 +1,7 @@
+# Shadow.pdf mapping:
+#   Not a direct Problem 1/2/3/4 script.
+# This script explores a product-state shadow interpolation experiment.
+
 using NumericalShadow
 using KernelAbstractions
 using LinearAlgebra
