@@ -1,7 +1,6 @@
 using KernelAbstractions
 using LinearAlgebra
 using NumericalShadow
-using Random
 using Test
 
 const HAS_CUDA_KA_QR_TEST = try
@@ -10,9 +9,6 @@ const HAS_CUDA_KA_QR_TEST = try
 catch
     false
 end
-
-const RUN_SLOW_TESTS = lowercase(get(ENV, "NUMERICALSHADOW_RUN_SLOW_TESTS", "false")) in
-                       ("1", "true", "yes")
 
 function native_random_unitary(::Type{T}, d::Int, batchsize::Int) where {T}
     Q = zeros(T, d, d, batchsize)
@@ -82,8 +78,6 @@ function phase_density(phases::AbstractVector{<:Real})
 end
 
 @testset "KA QR vs Native QR on CPU" begin
-    Random.seed!(1234)
-
     T = ComplexF64
     d = 6
     batchsize = 100
@@ -158,22 +152,18 @@ end
     end
 
     @testset "Eigenvalue phase distribution is approximately uniform" begin
-        if !RUN_SLOW_TESTS
-            @test_skip "Set NUMERICALSHADOW_RUN_SLOW_TESTS=true to enable statistical phase tests."
-        else
-            # CUE-like marginal check: eigenphases should be approximately uniform on [-π, π).
-            dim = 100
-            steps = 100
-            expected_density = 1 / (2π)
+        # CUE-like marginal check: eigenphases should be approximately uniform on [-π, π).
+        dim = 100
+        steps = 100
+        expected_density = 1 / (2π)
 
-            for Q_batch in (
-                random_unitary(CPU(), T, dim, steps),
-                native_random_unitary(T, dim, steps),
-            )
-                phases = collect_eigenphases(Q_batch)
-                empirical_density = phase_density(phases)
-                @test all(isapprox.(empirical_density, expected_density, atol = 0.03))
-            end
+        for Q_batch in (
+            random_unitary(CPU(), T, dim, steps),
+            native_random_unitary(T, dim, steps),
+        )
+            phases = collect_eigenphases(Q_batch)
+            empirical_density = phase_density(phases)
+            @test all(isapprox.(empirical_density, expected_density, atol = 0.03))
         end
     end
 
@@ -201,8 +191,6 @@ end
     if !HAS_CUDA_KA_QR_TEST
         @test_skip "CUDA not functional in this environment"
     else
-        Random.seed!(1234)
-
         backend = CUDABackend()
         T = ComplexF64
         d = 6
@@ -220,18 +208,14 @@ end
         end
 
         @testset "Eigenvalue phase distribution is approximately uniform" begin
-            if !RUN_SLOW_TESTS
-                @test_skip "Set NUMERICALSHADOW_RUN_SLOW_TESTS=true to enable statistical phase tests."
-            else
-                dim = 64
-                steps = 40
-                expected_density = 1 / (2π)
+            dim = 64
+            steps = 40
+            expected_density = 1 / (2π)
 
-                Q_batch = Array(random_unitary(backend, T, dim, steps))
-                phases = collect_eigenphases(Q_batch)
-                empirical_density = phase_density(phases)
-                @test all(isapprox.(empirical_density, expected_density, atol = 0.06))
-            end
+            Q_batch = Array(random_unitary(backend, T, dim, steps))
+            phases = collect_eigenphases(Q_batch)
+            empirical_density = phase_density(phases)
+            @test all(isapprox.(empirical_density, expected_density, atol = 0.06))
         end
     end
 end

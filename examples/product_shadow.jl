@@ -32,6 +32,6 @@ W = I(d) - 2 / local_d * proj(vec(I(local_d)))
     shadow.evs = eigvals(A)
     NumericalShadow.save(
          shadow,
-         "$(@__DIR__)/results/product_shadow_reflection_d=$(d)_$(rpad(α, 4, "0")).npz";
+         "$(@__DIR__)/results/product_shadow_reflection_d=$(d)_$(rpad(α, 4, "0")).h5";
      )
  end

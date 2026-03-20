@@ -56,23 +56,24 @@ end
 """
     save(h::Hist2D, fname)
 
-Serialize histogram `h` to an `.npz` file.
+Serialize histogram `h` to an HDF5 file.
 """
 function save(h::Hist2D, fname::String)
-    all_points = collect(Iterators.product(Array(h.x_edges), Array(h.y_edges)))
-    origin_dist, idx = findmin(x->sqrt(x[1]^2 + x[2]^2), all_points)
-    nearest_point = collect(all_points[idx])
-    d = Dict(
-        "x_edges" => Array(h.x_edges),
-        "y_edges" => Array(h.y_edges),
-        "hist" => Array(h.hist),
-        "nr" => isdefined(h, :nr) ? Array(h.nr) : nothing,
-        "evs" => isdefined(h, :evs) ? Array(h.evs) : nothing,
-    )
-    if isdefined(h, :other_range)
-        d["other_range"] = Array(h.other_range)
+    HDF5.h5open(fname, "w") do io
+        io["x_edges"] = Array(h.x_edges)
+        io["y_edges"] = Array(h.y_edges)
+        io["hist"] = Array(h.hist)
+
+        if isdefined(h, :nr)
+            io["nr"] = Array(h.nr)
+        end
+        if isdefined(h, :evs)
+            io["evs"] = Array(h.evs)
+        end
+        if isdefined(h, :other_range)
+            io["other_range"] = Array(h.other_range)
+        end
     end
-    NPZ.npzwrite(fname, d)
 end
 
 @kernel function histogram_kernel(xs, ys, @Const(x_edges), @Const(y_edges), hist_vec, nx_i32, ny_i32)

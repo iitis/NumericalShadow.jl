@@ -24,7 +24,7 @@ U = Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/3)]))
    shadow.other_range = NumericalShadow.qrange(U, q)
    NumericalShadow.save(
         shadow,
-        "$(@__DIR__)/results/qshadow_complex_$(rpad(q, 4, "0")).npz",
+        "$(@__DIR__)/results/qshadow_complex_$(rpad(q, 4, "0")).h5",
     )
 end
 
@@ -35,7 +35,7 @@ end
     shadow.other_range = NumericalShadow.qrange(U, q)
     NumericalShadow.save(
          shadow,
-         "$(@__DIR__)/results/product_qshadow_complex_$(rpad(q, 4, "0")).npz",
+         "$(@__DIR__)/results/product_qshadow_complex_$(rpad(q, 4, "0")).h5",
      )
  end
 
@@ -52,7 +52,7 @@ U = Array(Diagonal([1, exp(1im * π/3), exp(1im * 2π/3), exp(1im * 3π/3)]))
    shadow.other_range = NumericalShadow.qrange(U, q)
    NumericalShadow.save(
         shadow,
-        "$(@__DIR__)/results/qshadow_real_$(rpad(q, 4, "0")).npz",
+        "$(@__DIR__)/results/qshadow_real_$(rpad(q, 4, "0")).h5",
     )
 end
 
@@ -63,6 +63,6 @@ end
     shadow.other_range = NumericalShadow.qrange(U, q)
     NumericalShadow.save(
          shadow,
-         "$(@__DIR__)/results/product_qshadow_real_$(rpad(q, 4, "0")).npz",
+         "$(@__DIR__)/results/product_qshadow_real_$(rpad(q, 4, "0")).h5",
      )
  end

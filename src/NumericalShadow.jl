@@ -7,7 +7,7 @@ CPU and optional CUDA backends.
 module NumericalShadow
 using LinearAlgebra
 using KernelAbstractions
-using NPZ
+using HDF5
 
 include("random_matrices.jl")
 include("range.jl")

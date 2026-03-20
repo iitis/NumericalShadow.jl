@@ -38,7 +38,7 @@ U = kron(kron(I(2), U), I(2))
 #    shadow.other_range = NumericalShadow.qrange(U, q)
 #    NumericalShadow.save(
 #         shadow,
-#         "$(@__DIR__)/results/extended_qshadow_complex_$(rpad(q, 4, "0")).npz",
+#         "$(@__DIR__)/results/extended_qshadow_complex_$(rpad(q, 4, "0")).h5",
 #     )
 # end
 
@@ -49,7 +49,7 @@ U = kron(kron(I(2), U), I(2))
 #     shadow.other_range = NumericalShadow.qrange(U, q)
 #     NumericalShadow.save(
 #          shadow,
-#          "$(@__DIR__)/results/extended_product_qshadow_complex_$(rpad(q, 4, "0")).npz",
+#          "$(@__DIR__)/results/extended_product_qshadow_complex_$(rpad(q, 4, "0")).h5",
 #      )
 #  end
 
@@ -61,7 +61,7 @@ T = Float32
    shadow.other_range = NumericalShadow.qrange(U, q)
    NumericalShadow.save(
         shadow,
-        "$(@__DIR__)/results/extended_qshadow_real_$(rpad(q, 4, "0")).npz",
+        "$(@__DIR__)/results/extended_qshadow_real_$(rpad(q, 4, "0")).h5",
     )
 end
 
@@ -72,6 +72,6 @@ end
     shadow.other_range = NumericalShadow.qrange(U, q)
     NumericalShadow.save(
          shadow,
-         "$(@__DIR__)/results/extended_product_qshadow_real_$(rpad(q, 4, "0")).npz",
+         "$(@__DIR__)/results/extended_product_qshadow_real_$(rpad(q, 4, "0")).h5",
      )
  end

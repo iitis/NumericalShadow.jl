@@ -7,30 +7,38 @@ using KernelAbstractions
 using LinearAlgebra
 using CUDA
 
-CUDA.functional() || error("CUDA is not functional. This example requires a working CUDA setup.")
-backend = CUDABackend()
+function choose_backend()
+    use_cuda = lowercase(get(ENV, "NUMERICALSHADOW_USE_CUDA", "true")) in ("1", "true", "yes")
+    if use_cuda && CUDA.functional()
+        println("Using CUDA backend.")
+        return CUDABackend()
+    end
+    println("Using CPU backend.")
+    return CPU()
+end
 
-samples = 10^10
-batchsize = 10^8
-T = ComplexF32
+backend = choose_backend()
+samples = parse(Int, get(ENV, "NUMERICALSHADOW_SAMPLES", "100000000"))
+batchsize = parse(Int, get(ENV, "NUMERICALSHADOW_BATCHSIZE", "1000000"))
+batchsize > 0 || throw(ArgumentError("`batchsize` must be positive, got $batchsize"))
+samples > 0 || throw(ArgumentError("`samples` must be positive, got $samples"))
 
 A = collect(Diagonal([1, exp(2im * pi / 3), exp(4im * pi / 3)]))
-sampling_f = (b, d, n) -> NumericalShadow.random_pure(b, T, d, n)
+sampling_f = (b, d, n) -> NumericalShadow.random_pure(b, ComplexF32, d, n)
 shadow = NumericalShadow.shadow(backend, A, samples, sampling_f, batchsize)
 shadow.nr = NumericalShadow.numerical_range(A)
 shadow.evs = eigvals(A)
 NumericalShadow.save(
     shadow,
-    "$(@__DIR__)/results/normal_complex.npz",
+    "$(@__DIR__)/results/normal_complex.h5",
 )
 
-T = Float32
 A = collect(Diagonal([1, exp(2im * pi / 3), exp(4im * pi / 3)]))
-sampling_f = (b, d, n) -> NumericalShadow.random_pure(b, T, d, n)
+sampling_f = (b, d, n) -> NumericalShadow.random_pure(b, Float32, d, n)
 shadow = NumericalShadow.shadow(backend, A, samples, sampling_f, batchsize)
 shadow.nr = NumericalShadow.numerical_range(A)
 shadow.evs = eigvals(A)
 NumericalShadow.save(
     shadow,
-    "$(@__DIR__)/results/normal_real.npz",
+    "$(@__DIR__)/results/normal_real.h5",
 )
