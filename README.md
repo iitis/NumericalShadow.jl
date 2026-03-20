@@ -58,6 +58,25 @@ Run the broader benchmark suite:
 julia --project=benchmarks benchmarks/runbenchmarks.jl
 ```
 
+## Example Plots (Shadow.pdf Problems 2/3/4)
+
+Generate sample datasets:
+
+```bash
+julia --project=. examples/problem2_k_shadow.jl
+julia --project=. examples/problem3_c_shadow.jl
+julia --project=. examples/problem4_C_shadow.jl
+```
+
+These examples now write HDF5 files (`.h5`) to `examples/results/`.
+
+Render PNG plots (Julia + CairoMakie):
+
+```bash
+julia --project=examples -e 'using Pkg; Pkg.instantiate()'
+julia --project=examples examples/plot_problem_shadows.jl
+```
+
 ## Testing
 
 ```bash
